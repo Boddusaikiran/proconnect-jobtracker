@@ -1,5 +1,5 @@
 import { queryClient, apiRequest } from "./queryClient";
-import type { User, Job, Connection, Message, Notification, JobApplication, SavedJob } from "@shared/schema";
+import type { User, Job, Connection, Message, Notification, JobApplication, SavedJob, Experience, Education, Skill } from "@shared/schema";
 
 // Current user ID (hardcoded for MVP - in production would come from auth)
 export const CURRENT_USER_ID = "current-user-id";
@@ -19,6 +19,27 @@ export async function getUser(id: string): Promise<User> {
 
 export async function updateUser(id: string, updates: Partial<User>): Promise<User> {
   return apiRequest("PATCH", `/api/users/${id}`, updates);
+}
+
+// Experiences API
+export async function getExperiences(userId: string): Promise<Experience[]> {
+  const response = await fetch(`/api/users/${userId}/experiences`);
+  if (!response.ok) throw new Error("Failed to fetch experiences");
+  return response.json();
+}
+
+// Education API
+export async function getEducation(userId: string): Promise<Education[]> {
+  const response = await fetch(`/api/users/${userId}/education`);
+  if (!response.ok) throw new Error("Failed to fetch education");
+  return response.json();
+}
+
+// Skills API
+export async function getSkills(userId: string): Promise<Skill[]> {
+  const response = await fetch(`/api/users/${userId}/skills`);
+  if (!response.ok) throw new Error("Failed to fetch skills");
+  return response.json();
 }
 
 // Jobs API

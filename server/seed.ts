@@ -6,7 +6,7 @@ export async function seedData() {
   const user1 = {
     id: user1Id,
     username: "alex_thompson",
-    password: "password123",
+    password: "",
     fullName: "Alex Thompson",
     headline: "Senior Product Designer | UX Specialist | Design Systems Advocate",
     email: "alex.thompson@email.com",
@@ -22,7 +22,7 @@ export async function seedData() {
 
   const user2 = await storage.createUser({
     username: "sarah_johnson",
-    password: "password123",
+    password: "",
     fullName: "Sarah Johnson",
     headline: "Senior Product Designer at TechCorp",
     email: "sarah.johnson@techcorp.com",
@@ -34,7 +34,7 @@ export async function seedData() {
 
   const user3 = await storage.createUser({
     username: "michael_chen",
-    password: "password123",
+    password: "",
     fullName: "Michael Chen",
     headline: "Software Engineer at Global Solutions Inc",
     email: "michael.chen@globalsolutions.com",
@@ -46,7 +46,7 @@ export async function seedData() {
 
   const user4 = await storage.createUser({
     username: "emily_rodriguez",
-    password: "password123",
+    password: "",
     fullName: "Dr. Emily Rodriguez",
     headline: "Chief Technology Officer at InnovateTech",
     email: "emily.rodriguez@innovatetech.com",
@@ -58,7 +58,7 @@ export async function seedData() {
 
   const user5 = await storage.createUser({
     username: "david_kim",
-    password: "password123",
+    password: "",
     fullName: "David Kim",
     headline: "Full Stack Developer at StartupXYZ",
     email: "david.kim@startupxyz.com",

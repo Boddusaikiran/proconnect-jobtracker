@@ -1,99 +1,169 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Search, UserPlus, UserMinus, Check, X, Users } from "lucide-react";
-import avatar1 from "@assets/generated_images/Female_professional_headshot_125267a8.png";
-import avatar2 from "@assets/generated_images/Male_professional_headshot_d316bd07.png";
-import avatar3 from "@assets/generated_images/Senior_female_professional_b467fc71.png";
-import avatar4 from "@assets/generated_images/Young_male_professional_8999059f.png";
+import { 
+  getUsers, 
+  getConnections, 
+  createConnection, 
+  updateConnection, 
+  deleteConnection, 
+  CURRENT_USER_ID 
+} from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Connection, User } from "@shared/schema";
 
 export default function Network() {
   const [activeTab, setActiveTab] = useState("connections");
+  const { toast } = useToast();
 
-  const connections = [
-    {
-      id: "1",
-      name: "Sarah Johnson",
-      headline: "Senior Product Designer at TechCorp",
-      avatar: avatar1,
-      mutualConnections: 12,
-      connected: true,
-    },
-    {
-      id: "2",
-      name: "Michael Chen",
-      headline: "Software Engineer at Global Solutions Inc",
-      avatar: avatar2,
-      mutualConnections: 8,
-      connected: true,
-    },
-    {
-      id: "3",
-      name: "Dr. Emily Rodriguez",
-      headline: "Chief Technology Officer at InnovateTech",
-      avatar: avatar3,
-      mutualConnections: 15,
-      connected: true,
-    },
-    {
-      id: "4",
-      name: "David Kim",
-      headline: "Full Stack Developer at StartupXYZ",
-      avatar: avatar4,
-      mutualConnections: 6,
-      connected: true,
-    },
-  ];
+  // Fetch accepted connections
+  const { data: acceptedConnections = [], isLoading: connectionsLoading } = useQuery({
+    queryKey: ["/api/users", CURRENT_USER_ID, "connections", "accepted"],
+    queryFn: () => getConnections(CURRENT_USER_ID, "accepted"),
+  });
 
-  const invitations = [
-    {
-      id: "5",
-      name: "Jessica Martinez",
-      headline: "Marketing Director at BrandCo",
-      avatar: avatar1,
-      mutualConnections: 5,
-      time: "2d ago",
-    },
-    {
-      id: "6",
-      name: "Robert Taylor",
-      headline: "Data Scientist at Analytics Pro",
-      avatar: avatar2,
-      mutualConnections: 3,
-      time: "1w ago",
-    },
-  ];
+  // Fetch pending invitations (where current user is the connected user)
+  const { data: allPending = [], isLoading: invitationsLoading } = useQuery({
+    queryKey: ["/api/users", CURRENT_USER_ID, "connections", "pending"],
+    queryFn: () => getConnections(CURRENT_USER_ID, "pending"),
+  });
 
-  const suggestions = [
-    {
-      id: "7",
-      name: "Amanda Wilson",
-      headline: "UX Researcher at DesignHub",
-      avatar: avatar3,
-      mutualConnections: 18,
-      reason: "Works at TechCorp",
+  // Fetch all users for suggestions
+  const { data: allUsers = [], isLoading: usersLoading } = useQuery({
+    queryKey: ["/api/users"],
+    queryFn: getUsers,
+  });
+
+  // Accept connection mutation
+  const acceptMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) => updateConnection(id, "accepted"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", CURRENT_USER_ID, "connections"] });
+      toast({ title: "Connection accepted!" });
     },
-    {
-      id: "8",
-      name: "James Anderson",
-      headline: "Product Manager at InnovateTech",
-      avatar: avatar4,
-      mutualConnections: 7,
-      reason: "Attended Stanford University",
+    onError: () => {
+      toast({ title: "Failed to accept connection", variant: "destructive" });
     },
-    {
-      id: "9",
-      name: "Lisa Brown",
-      headline: "Frontend Developer at WebWorks",
-      avatar: avatar1,
-      mutualConnections: 11,
-      reason: "Based in San Francisco",
+  });
+
+  // Reject connection mutation
+  const rejectMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) => updateConnection(id, "rejected"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", CURRENT_USER_ID, "connections"] });
+      toast({ title: "Connection request ignored" });
     },
-  ];
+    onError: () => {
+      toast({ title: "Failed to reject connection", variant: "destructive" });
+    },
+  });
+
+  // Send connection request mutation
+  const connectMutation = useMutation({
+    mutationFn: ({ connectedUserId }: { connectedUserId: string }) => 
+      createConnection(CURRENT_USER_ID, connectedUserId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", CURRENT_USER_ID, "connections"] });
+      toast({ title: "Connection request sent!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to send connection request", variant: "destructive" });
+    },
+  });
+
+  // Remove connection mutation
+  const removeMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) => deleteConnection(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", CURRENT_USER_ID, "connections"] });
+      toast({ title: "Connection removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove connection", variant: "destructive" });
+    },
+  });
+
+  // Get user details for connections
+  const connectionsWithUsers = acceptedConnections.map(conn => {
+    const otherUserId = conn.userId === CURRENT_USER_ID ? conn.connectedUserId : conn.userId;
+    const user = allUsers.find(u => u.id === otherUserId);
+    return { connection: conn, user };
+  }).filter(item => item.user);
+
+  // Get pending invitations (where current user received the request)
+  const invitations = allPending
+    .filter(conn => conn.connectedUserId === CURRENT_USER_ID)
+    .map(conn => {
+      const user = allUsers.find(u => u.id === conn.userId);
+      return { connection: conn, user };
+    })
+    .filter(item => item.user);
+
+  // Get suggestions (users who are not connected and not pending)
+  const connectedUserIds = new Set([
+    ...acceptedConnections.map(c => c.userId === CURRENT_USER_ID ? c.connectedUserId : c.userId),
+    ...allPending.map(c => c.userId === CURRENT_USER_ID ? c.connectedUserId : c.userId),
+    ...allPending.map(c => c.connectedUserId === CURRENT_USER_ID ? c.userId : c.connectedUserId),
+  ]);
+  
+  const suggestions = allUsers.filter(
+    user => user.id !== CURRENT_USER_ID && !connectedUserIds.has(user.id)
+  );
+
+  if (connectionsLoading || invitationsLoading || usersLoading) {
+    return (
+      <div className="min-h-screen bg-muted/30">
+        <div className="container mx-auto px-4 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <aside className="lg:col-span-3">
+              <Card>
+                <CardHeader className="pb-3">
+                  <Skeleton className="h-6 w-32" />
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </CardContent>
+              </Card>
+            </aside>
+            <main className="lg:col-span-9">
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-8 w-48" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {[1, 2, 3].map(i => (
+                      <Card key={i}>
+                        <CardContent className="p-4">
+                          <div className="flex gap-4">
+                            <Skeleton className="h-16 w-16 rounded-full" />
+                            <div className="flex-1 space-y-2">
+                              <Skeleton className="h-5 w-48" />
+                              <Skeleton className="h-4 w-64" />
+                              <Skeleton className="h-4 w-32" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </main>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -110,7 +180,7 @@ export default function Network() {
                     <Users className="h-5 w-5 text-muted-foreground" />
                     <span className="text-sm font-medium">Connections</span>
                   </div>
-                  <Badge variant="secondary">{connections.length}</Badge>
+                  <Badge variant="secondary">{connectionsWithUsers.length}</Badge>
                 </div>
                 <div className="flex items-center justify-between p-2 rounded-md hover-elevate cursor-pointer">
                   <div className="flex items-center gap-3">
@@ -143,7 +213,7 @@ export default function Network() {
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="connections" data-testid="tab-connections">
-                      Connections ({connections.length})
+                      Connections ({connectionsWithUsers.length})
                     </TabsTrigger>
                     <TabsTrigger value="invitations" data-testid="tab-invitations">
                       Invitations ({invitations.length})
@@ -155,21 +225,21 @@ export default function Network() {
 
                   <TabsContent value="connections" className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {connections.map((connection) => (
+                      {connectionsWithUsers.map(({ connection, user }) => (
                         <Card key={connection.id} className="hover-elevate" data-testid={`card-connection-${connection.id}`}>
                           <CardContent className="p-4">
                             <div className="flex gap-4">
                               <Avatar className="h-16 w-16">
-                                <AvatarImage src={connection.avatar} />
-                                <AvatarFallback>{connection.name[0]}</AvatarFallback>
+                                <AvatarImage src={user!.avatarUrl || undefined} />
+                                <AvatarFallback>{user!.fullName[0]}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-semibold truncate">{connection.name}</h4>
+                                <h4 className="font-semibold truncate">{user!.fullName}</h4>
                                 <p className="text-sm text-muted-foreground line-clamp-2">
-                                  {connection.headline}
+                                  {user!.headline}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {connection.mutualConnections} mutual connections
+                                  {user!.location || "No location"}
                                 </p>
                                 <div className="flex gap-2 mt-3">
                                   <Button variant="outline" size="sm" className="flex-1" data-testid={`button-message-${connection.id}`}>
@@ -178,6 +248,8 @@ export default function Network() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
+                                    onClick={() => removeMutation.mutate({ id: connection.id })}
+                                    disabled={removeMutation.isPending}
                                     data-testid={`button-remove-${connection.id}`}
                                   >
                                     <UserMinus className="h-4 w-4" />
@@ -188,37 +260,53 @@ export default function Network() {
                           </CardContent>
                         </Card>
                       ))}
+                      {connectionsWithUsers.length === 0 && (
+                        <div className="col-span-full text-center py-12 text-muted-foreground">
+                          No connections yet. Start connecting with people!
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
 
                   <TabsContent value="invitations" className="mt-6">
                     <div className="space-y-4">
-                      {invitations.map((invitation) => (
-                        <Card key={invitation.id} data-testid={`card-invitation-${invitation.id}`}>
+                      {invitations.map(({ connection, user }) => (
+                        <Card key={connection.id} data-testid={`card-invitation-${connection.id}`}>
                           <CardContent className="p-4">
                             <div className="flex items-start gap-4">
                               <Avatar className="h-16 w-16">
-                                <AvatarImage src={invitation.avatar} />
-                                <AvatarFallback>{invitation.name[0]}</AvatarFallback>
+                                <AvatarImage src={user!.avatarUrl || undefined} />
+                                <AvatarFallback>{user!.fullName[0]}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1">
                                 <div className="flex items-start justify-between">
                                   <div>
-                                    <h4 className="font-semibold">{invitation.name}</h4>
+                                    <h4 className="font-semibold">{user!.fullName}</h4>
                                     <p className="text-sm text-muted-foreground">
-                                      {invitation.headline}
+                                      {user!.headline}
                                     </p>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                      {invitation.mutualConnections} mutual connections · {invitation.time}
+                                      {user!.location || "No location"} · {new Date(connection.createdAt).toLocaleDateString()}
                                     </p>
                                   </div>
                                 </div>
                                 <div className="flex gap-2 mt-3">
-                                  <Button size="sm" data-testid={`button-accept-${invitation.id}`}>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => acceptMutation.mutate({ id: connection.id })}
+                                    disabled={acceptMutation.isPending}
+                                    data-testid={`button-accept-${connection.id}`}
+                                  >
                                     <Check className="h-4 w-4 mr-2" />
                                     Accept
                                   </Button>
-                                  <Button variant="outline" size="sm" data-testid={`button-ignore-${invitation.id}`}>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => rejectMutation.mutate({ id: connection.id })}
+                                    disabled={rejectMutation.isPending}
+                                    data-testid={`button-ignore-${connection.id}`}
+                                  >
                                     <X className="h-4 w-4 mr-2" />
                                     Ignore
                                   </Button>
@@ -228,30 +316,43 @@ export default function Network() {
                           </CardContent>
                         </Card>
                       ))}
+                      {invitations.length === 0 && (
+                        <div className="text-center py-12 text-muted-foreground">
+                          No pending invitations
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
 
                   <TabsContent value="suggestions" className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {suggestions.map((suggestion) => (
-                        <Card key={suggestion.id} className="hover-elevate" data-testid={`card-suggestion-${suggestion.id}`}>
+                      {suggestions.map((user) => (
+                        <Card key={user.id} className="hover-elevate" data-testid={`card-suggestion-${user.id}`}>
                           <CardContent className="p-4">
                             <div className="flex flex-col items-center text-center">
                               <Avatar className="h-20 w-20">
-                                <AvatarImage src={suggestion.avatar} />
-                                <AvatarFallback>{suggestion.name[0]}</AvatarFallback>
+                                <AvatarImage src={user.avatarUrl || undefined} />
+                                <AvatarFallback>{user.fullName[0]}</AvatarFallback>
                               </Avatar>
-                              <h4 className="font-semibold mt-3">{suggestion.name}</h4>
+                              <h4 className="font-semibold mt-3">{user.fullName}</h4>
                               <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                                {suggestion.headline}
+                                {user.headline}
                               </p>
                               <p className="text-xs text-muted-foreground mt-2">
-                                {suggestion.mutualConnections} mutual connections
+                                {user.location || "No location"}
                               </p>
-                              <Badge variant="secondary" className="mt-2 text-xs">
-                                {suggestion.reason}
-                              </Badge>
-                              <Button className="w-full mt-4" size="sm" data-testid={`button-connect-${suggestion.id}`}>
+                              {user.location && (
+                                <Badge variant="secondary" className="mt-2 text-xs">
+                                  {user.location}
+                                </Badge>
+                              )}
+                              <Button 
+                                className="w-full mt-4" 
+                                size="sm" 
+                                onClick={() => connectMutation.mutate({ connectedUserId: user.id })}
+                                disabled={connectMutation.isPending}
+                                data-testid={`button-connect-${user.id}`}
+                              >
                                 <UserPlus className="h-4 w-4 mr-2" />
                                 Connect
                               </Button>
@@ -259,6 +360,11 @@ export default function Network() {
                           </CardContent>
                         </Card>
                       ))}
+                      {suggestions.length === 0 && (
+                        <div className="col-span-full text-center py-12 text-muted-foreground">
+                          No suggestions available
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
                 </Tabs>

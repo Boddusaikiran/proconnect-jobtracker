@@ -1,6 +1,6 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express, { NextFunction, type Request, Response } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { log, serveStatic, setupVite } from "./vite";
 
 const app = express();
 
@@ -77,11 +77,19 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
+  const listenOpts: any = {
     port,
     host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  };
+
+  // reusePort / SO_REUSEPORT is not supported on some platforms (Windows),
+  // which can cause an ENOTSUP when attempting to listen. Only enable it
+  // on platforms that typically support it (non-win32).
+  if (process.platform !== "win32") {
+    listenOpts.reusePort = true;
+  }
+
+  server.listen(listenOpts, () => {
     log(`serving on port ${port}`);
   });
 })();

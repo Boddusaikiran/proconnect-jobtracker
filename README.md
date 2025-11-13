@@ -1,4 +1,4 @@
-# CodeRead - AI-Powered Job Search Platform
+# proconnect-jobtracker - AI-Powered Job Search Platform
 
 A full-stack job search platform with AI-powered message generation, real-time notifications, and professional networking features.
 

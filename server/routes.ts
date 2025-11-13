@@ -1,18 +1,21 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
-import { storage } from "./storage";
 import {
-  insertUserSchema,
-  insertExperienceSchema,
-  insertEducationSchema,
-  insertSkillSchema,
   insertConnectionSchema,
-  insertJobSchema,
+  insertEducationSchema,
+  insertExperienceSchema,
   insertJobApplicationSchema,
-  insertSavedJobSchema,
+  insertJobSchema,
   insertMessageSchema,
   insertNotificationSchema,
+  insertSavedJobSchema,
+  insertSkillSchema,
+  insertUserSchema,
 } from "@shared/schema";
+import bcrypt from "bcryptjs";
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import jwt from "jsonwebtoken";
+import { Server as IOServer } from "socket.io";
+import { storage } from "./storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Users
@@ -36,6 +39,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(user);
     } catch (error) {
       res.status(400).json({ error: "Invalid user data" });
+    }
+  });
+
+  // Auth (simple JWT + bcrypt using MemStorage)
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { name, email, password, headline } = req.body as any;
+      if (!name || !email || !password) return res.status(400).json({ error: "Missing fields" });
+
+      // avoid duplicate emails
+      const existing = (await storage.getAllUsers()).find((u) => u.email === email);
+      if (existing) return res.status(400).json({ error: "User exists" });
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const username = email.split("@")[0];
+      const insert = {
+        username,
+        password: passwordHash,
+        fullName: name,
+        headline: headline || "",
+        email,
+      } as any;
+
+      const user = await storage.createUser(insert);
+      const token = jwt.sign({ sub: user.id }, process.env.JWT_SECRET || "dev_jwt_secret", { expiresIn: "30d" });
+      res.status(201).json({ user, token });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body as any;
+      if (!email || !password) return res.status(400).json({ error: "Missing fields" });
+
+      const users = await storage.getAllUsers();
+      const user = users.find((u) => u.email === email);
+      if (!user) return res.status(401).json({ error: "Invalid credentials" });
+
+      const ok = await bcrypt.compare(password, (user as any).password);
+      if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+
+      const token = jwt.sign({ sub: user.id }, process.env.JWT_SECRET || "dev_jwt_secret", { expiresIn: "30d" });
+      res.json({ user, token });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || "Login failed" });
     }
   });
 
@@ -232,6 +282,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const jobData = insertJobSchema.parse(req.body);
       const job = await storage.createJob(jobData);
+      // emit realtime event if socket.io is attached
+      try {
+        (app as any)._io?.emit?.("job:posted", job);
+      } catch (e) { }
       res.status(201).json(job);
     } catch (error) {
       res.status(400).json({ error: "Invalid job data" });
@@ -267,6 +321,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         actorId: null,
         read: false,
       });
+
+      // realtime notify applicant (if sockets attached)
+      try {
+        (app as any)._io?.to(appData.userId).emit?.("application:status", { jobId: application.jobId, status: application.status, appliedAt: application.appliedAt });
+      } catch (e) { }
 
       res.status(201).json(application);
     } catch (error) {
@@ -338,6 +397,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         read: false,
       });
 
+      // realtime notify receiver
+      try {
+        (app as any)._io?.to(msgData.receiverId).emit?.("message:received", message);
+      } catch (e) { }
+
       res.status(201).json(message);
     } catch (error) {
       res.status(400).json({ error: "Invalid message data" });
@@ -350,6 +414,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Message not found" });
     }
     res.status(204).send();
+  });
+
+  // AI Job Butler endpoints (MVP)
+  app.post("/api/ai/generate-message", async (req, res) => {
+    try {
+      const { userId, jobDescription, tone } = req.body as { userId?: string; jobDescription: string; tone?: string };
+      const user = userId ? await storage.getUser(userId) : undefined;
+
+      // Lazy import to avoid heavyweight deps in other flows
+      const { generateMessage } = await import("./ai");
+
+      const userProfile = user
+        ? `${user.fullName} — ${user.headline}. About: ${user.about || ""}`
+        : undefined;
+
+      const draft = await generateMessage({ userProfile, jobDescription, tone });
+      res.json({ draft });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to generate message" });
+    }
+  });
+
+  app.post("/api/ai/send-message", async (req, res) => {
+    try {
+      const { senderId, receiverId, content } = req.body as { senderId: string; receiverId: string; content: string };
+      // validate using insertMessageSchema
+      const msgData = insertMessageSchema.parse({ senderId, receiverId, content });
+      const message = await storage.createMessage(msgData);
+
+      // create notification for receiver
+      await storage.createNotification({
+        userId: receiverId,
+        type: "message",
+        content: "received a message",
+        actorId: senderId,
+        read: false,
+      });
+
+      res.status(201).json(message);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || "Failed to send message" });
+    }
   });
 
   // Notifications
@@ -382,6 +488,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+
+  // Attach Socket.IO to the HTTP server and expose via app for route handlers
+  try {
+    const io = new IOServer(httpServer, { cors: { origin: '*' } });
+    (app as any)._io = io;
+    io.on('connection', (socket: any) => {
+      socket.on('identify', (userId: string) => {
+        socket.join(userId);
+      });
+      socket.on('ping', (data: any) => {
+        socket.emit('pong', { at: new Date().toISOString(), data });
+      });
+    });
+  } catch (e) {
+    // ignore if socket.io cannot be attached
+  }
 
   return httpServer;
 }

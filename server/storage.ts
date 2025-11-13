@@ -1,26 +1,27 @@
 import {
-  type User,
-  type InsertUser,
-  type Experience,
-  type InsertExperience,
-  type Education,
-  type InsertEducation,
-  type Skill,
-  type InsertSkill,
   type Connection,
+  type Education,
+  type Experience,
   type InsertConnection,
-  type Job,
+  type InsertEducation,
+  type InsertExperience,
   type InsertJob,
-  type JobApplication,
   type InsertJobApplication,
-  type SavedJob,
-  type InsertSavedJob,
-  type Message,
   type InsertMessage,
-  type Notification,
   type InsertNotification,
+  type InsertSavedJob,
+  type InsertSkill,
+  type InsertUser,
+  type Job,
+  type JobApplication,
+  type Message,
+  type Notification,
+  type SavedJob,
+  type Skill,
+  type User,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import DrizzleStorage from './drizzleStorage';
 
 export interface IStorage {
   // Users
@@ -430,4 +431,18 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+let storageImpl: IStorage;
+if (process.env.DATABASE_URL) {
+  try {
+    storageImpl = new DrizzleStorage(process.env.DATABASE_URL);
+    console.log('[storage] Using Drizzle (Postgres) storage');
+  } catch (err) {
+    console.error('[storage] Failed to initialize DrizzleStorage, falling back to MemStorage', err);
+    storageImpl = new MemStorage();
+  }
+} else {
+  console.log('[storage] DATABASE_URL not set, using in-memory storage');
+  storageImpl = new MemStorage();
+}
+
+export const storage = storageImpl;

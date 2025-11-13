@@ -90,6 +90,6 @@ app.use((req, res, next) => {
   }
 
   server.listen(listenOpts, () => {
-    log(`serving on port ${port}`);
+    log(`serving on port localhost:${port}`);
   });
 })();

@@ -1,95 +1,44 @@
-import express, { NextFunction, type Request, Response } from "express";
-import { registerRoutes } from "./routes";
-import { log, serveStatic, setupVite } from "./vite";
+import cors from "cors";
+import express from "express";
+import path from "path";
+import { seedData } from "./seed";
 
 const app = express();
+app.use(cors());
+app.use(express.json());
 
-declare module 'http' {
-  interface IncomingMessage {
-    rawBody: unknown
+const PORT = 5000;
+
+async function startServer() {
+  try {
+    console.log("[storage] DATABASE_URL not set, using in-memory storage");
+    await seedData();
+    console.log("✅ Database seeded successfully");
+
+    // Serve static files from client directory
+    const clientPath = path.join(process.cwd(), "client");
+    app.use(express.static(clientPath));
+    app.use(express.static(path.join(clientPath, "public")));
+
+    // Serve index.html for all routes (SPA routing)
+    app.get("*", (req, res) => {
+      const indexPath = path.join(clientPath, "index.html");
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error("Error serving index.html:", err);
+          res.status(404).send("index.html not found");
+        }
+      });
+    });
+
+    app.listen(PORT, () => {
+      console.log(`🌐 Server running on http://localhost:${PORT}`);
+      console.log("👉 Open this link manually in your browser.");
+    });
+  } catch (err) {
+    console.error("❌ Error starting server:", err);
   }
 }
-app.use(express.json({
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  }
-}));
-app.use(express.urlencoded({ extended: false }));
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+startServer();
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
-
-(async () => {
-  const server = await registerRoutes(app);
-
-  // Seed initial data for demo purposes (development only)
-  if (app.get("env") === "development") {
-    const { seedData } = await import("./seed");
-    await seedData();
-  }
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  const listenOpts: any = {
-    port,
-    host: "0.0.0.0",
-  };
-
-  // reusePort / SO_REUSEPORT is not supported on some platforms (Windows),
-  // which can cause an ENOTSUP when attempting to listen. Only enable it
-  // on platforms that typically support it (non-win32).
-  if (process.platform !== "win32") {
-    listenOpts.reusePort = true;
-  }
-
-  server.listen(listenOpts, () => {
-    log(`serving on port localhost:${port}`);
-  });
-})();

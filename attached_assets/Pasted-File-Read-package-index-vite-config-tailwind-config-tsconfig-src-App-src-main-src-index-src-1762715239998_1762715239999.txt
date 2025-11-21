@@ -1,0 +1,101 @@
+File Read
+package
+index
+vite.config
+tailwind.config
+tsconfig
+src/App
+src/main
+src/index
+src/components/base/Button
+src/components/base/Card
+src/components/base/Input
+src/pages/home/page
+src/pages/jobs/JobsPage
+src/pages/messages/MessagesPage
+src/pages/network/NetworkPage
+src/pages/notifications/NotificationsPage
+src/pages/profile/ProfilePage
+src/pages/auth/LoginPage
+src/pages/NotFound
+src/router/index
+Perfect! Here’s all the code for your LinkedIn-style professional networking platform project. I’ve organized everything you need to upload to GitHub:
+
+📁 Complete Project Structure
+Root Configuration Files:
+
+package.json
+Project dependencies and scripts
+index.html
+Main HTML entry point with SEO optimization
+vite.config.ts
+Build configuration with auto-imports
+tailwind.config.ts
+Styling configuration
+tsconfig.json
+TypeScript configuration
+Source Code (src/ folder):
+
+App.tsx
+Main application component
+main.tsx
+Application entry point
+index.css
+Global Tailwind CSS styles
+Components (src/components/):
+
+base/Button.tsx
+Reusable button component with variants
+base/Card.tsx
+Card component for consistent layouts
+base/Input.tsx
+Input component with validation
+feature/Header.tsx
+Navigation header component
+Pages (src/pages/):
+
+home/page.tsx
+Home page template
+jobs/JobsPage.tsx
+Complete job search and application system
+messages/MessagesPage.tsx
+Professional messaging interface
+network/NetworkPage.tsx
+Networking and connections management
+notifications/NotificationsPage.tsx
+Notification center
+profile/ProfilePage.tsx
+User profile management
+auth/LoginPage.tsx
+Authentication page
+NotFound.tsx
+404 error page
+Router (src/router/):
+
+config.tsx
+Route definitions
+index.ts
+Router setup with navigation
+🚀 Key Features Your Project Includes
+Professional Networking:
+
+Complete user profiles with experience, education, skills
+Connection requests and network management
+Professional messaging system with real-time chat interface
+Job Search Platform:
+
+Advanced job filtering (location, type, experience, salary)
+Job application tracking and status management
+Easy apply functionality with application history
+Job alerts and recommendations
+Social Features:
+
+Notification system for all platform activities
+Professional feed capabilities
+Connection management and suggestions
+Modern Tech Stack:
+
+React 19 with TypeScript
+Tailwind CSS for styling
+React Router for navigation
+Responsive design for all devices

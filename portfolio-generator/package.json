@@ -1,0 +1,16 @@
+{
+   "name": "portfolio-generator",
+   "version": "0.1.0",
+   "description": "Auto Portfolio generator tools (scan/unpack/prepare)",
+   "main": "generate-portfolio.js",
+   "type": "commonjs",
+   "scripts": {
+      "start": "node generate-portfolio.js"
+   },
+   "dependencies": {
+      "adm-zip": "^0.5.9",
+      "mammoth": "^1.4.19",
+      "pdf-parse": "^1.1.1",
+      "node-fetch": "^2.6.7"
+   }
+}

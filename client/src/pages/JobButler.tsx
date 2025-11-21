@@ -1,3 +1,4 @@
+import AIChat from "@/components/AIChat";
 import { useEffect, useState } from "react";
 
 export default function JobButler() {
@@ -71,6 +72,9 @@ export default function JobButler() {
                <p className="whitespace-pre-wrap">{draft}</p>
             </div>
          )}
+
+         {/* AI chat integrated into the main app */}
+         <AIChat />
       </div>
    );
 }

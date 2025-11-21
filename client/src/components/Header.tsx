@@ -1,9 +1,5 @@
-import { Link, useLocation } from "wouter";
-import { Home, Users, Briefcase, MessageSquare, Bell, Search, User, Menu } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,16 +8,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Bell, Briefcase, FileText, Home, Menu, MessageSquare, Search, User, Users } from "lucide-react";
 import { useState } from "react";
+import { Link, useLocation } from "wouter";
 
 export function Header() {
   const [location] = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
-  
+
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/network", icon: Users, label: "Network" },
     { path: "/jobs", icon: Briefcase, label: "Jobs" },
+    { path: "/job-butler", icon: MessageSquare, label: "Job Butler" },
+    { path: "/docs", icon: FileText, label: "Docs" },
     { path: "/messages", icon: MessageSquare, label: "Messages" },
     { path: "/notifications", icon: Bell, label: "Notifications" },
   ];
@@ -59,9 +60,8 @@ export function Header() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={`flex flex-col items-center gap-1 h-auto py-2 px-3 ${
-                    isActive(item.path) ? 'text-primary' : 'text-muted-foreground'
-                  }`}
+                  className={`flex flex-col items-center gap-1 h-auto py-2 px-3 ${isActive(item.path) ? 'text-primary' : 'text-muted-foreground'
+                    }`}
                   data-testid={`link-${item.label.toLowerCase()}`}
                 >
                   <item.icon className="h-5 w-5" />
@@ -130,9 +130,8 @@ export function Header() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={`flex flex-col items-center gap-1 h-auto py-2 px-3 ${
-                    isActive(item.path) ? 'text-primary' : 'text-muted-foreground'
-                  }`}
+                  className={`flex flex-col items-center gap-1 h-auto py-2 px-3 ${isActive(item.path) ? 'text-primary' : 'text-muted-foreground'
+                    }`}
                 >
                   <item.icon className="h-5 w-5" />
                   <span className="text-xs font-medium">{item.label}</span>

@@ -71,24 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const { email, password } = req.body as any;
-      if (!email || !password) return res.status(400).json({ error: "Missing fields" });
 
-      const users = await storage.getAllUsers();
-      const user = users.find((u) => u.email === email);
-      if (!user) return res.status(401).json({ error: "Invalid credentials" });
-
-      const ok = await bcrypt.compare(password, (user as any).password);
-      if (!ok) return res.status(401).json({ error: "Invalid credentials" });
-
-      const token = jwt.sign({ sub: user.id }, process.env.JWT_SECRET || "dev_jwt_secret", { expiresIn: "30d" });
-      res.json({ user, token });
-    } catch (err: any) {
-      res.status(400).json({ error: err.message || "Login failed" });
-    }
-  });
 
   app.patch("/api/users/:id", async (req, res) => {
     const user = await storage.updateUser(req.params.id, req.body);
@@ -424,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = userId ? await storage.getUser(userId) : undefined;
 
       // Lazy import to avoid heavyweight deps in other flows
-      const { generateMessage } = await import("./ai");
+      const { generateMessage } = await import("../ai");
 
       const userProfile = user
         ? `${user.fullName} — ${user.headline}. About: ${user.about || ""}`

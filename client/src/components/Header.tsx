@@ -21,6 +21,7 @@ export function Header() {
     { path: "/", icon: Home, label: "Home" },
     { path: "/network", icon: Users, label: "Network" },
     { path: "/jobs", icon: Briefcase, label: "Jobs" },
+    { path: "/pipeline", icon: Briefcase, label: "Pipeline" },
     { path: "/job-butler", icon: MessageSquare, label: "Job Butler" },
     { path: "/docs", icon: FileText, label: "Docs" },
     { path: "/messages", icon: MessageSquare, label: "Messages" },

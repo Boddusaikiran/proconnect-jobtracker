@@ -14,6 +14,10 @@ export const users = pgTable("users", {
   coverUrl: text("cover_url"),
   location: text("location"),
   about: text("about"),
+  role: text("role").default("candidate").notNull(), // 'candidate', 'recruiter', 'admin'
+  googleId: text("google_id"),
+  resetToken: text("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

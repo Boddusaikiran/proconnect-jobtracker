@@ -27,6 +27,7 @@ export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
@@ -123,9 +124,27 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.email === email,
+    );
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id, createdAt: new Date() };
+    const user: User = {
+      ...insertUser,
+      id,
+      createdAt: new Date(),
+      avatarUrl: insertUser.avatarUrl ?? null,
+      coverUrl: insertUser.coverUrl ?? null,
+      location: insertUser.location ?? null,
+      about: insertUser.about ?? null,
+      googleId: insertUser.googleId ?? null,
+      resetToken: insertUser.resetToken ?? null,
+      resetTokenExpiry: insertUser.resetTokenExpiry ?? null,
+      role: insertUser.role ?? "candidate"
+    };
     this.users.set(id, user);
     return user;
   }
@@ -151,7 +170,15 @@ export class MemStorage implements IStorage {
 
   async createExperience(insertExperience: InsertExperience): Promise<Experience> {
     const id = randomUUID();
-    const experience: Experience = { ...insertExperience, id };
+    const experience: Experience = {
+      ...insertExperience,
+      id,
+      location: insertExperience.location ?? null,
+      companyLogo: insertExperience.companyLogo ?? null,
+      endDate: insertExperience.endDate ?? null,
+      current: insertExperience.current ?? false,
+      description: insertExperience.description ?? null
+    };
     this.experiences.set(id, experience);
     return experience;
   }
@@ -177,7 +204,12 @@ export class MemStorage implements IStorage {
 
   async createEducation(insertEducation: InsertEducation): Promise<Education> {
     const id = randomUUID();
-    const education: Education = { ...insertEducation, id };
+    const education: Education = {
+      ...insertEducation,
+      id,
+      endDate: insertEducation.endDate ?? null,
+      current: insertEducation.current ?? false
+    };
     this.education.set(id, education);
     return education;
   }
@@ -203,7 +235,11 @@ export class MemStorage implements IStorage {
 
   async createSkill(insertSkill: InsertSkill): Promise<Skill> {
     const id = randomUUID();
-    const skill: Skill = { ...insertSkill, id };
+    const skill: Skill = {
+      ...insertSkill,
+      id,
+      endorsements: insertSkill.endorsements ?? 0
+    };
     this.skills.set(id, skill);
     return skill;
   }
@@ -279,7 +315,13 @@ export class MemStorage implements IStorage {
 
   async createJob(insertJob: InsertJob): Promise<Job> {
     const id = randomUUID();
-    const job: Job = { ...insertJob, id, postedAt: new Date() };
+    const job: Job = {
+      ...insertJob,
+      id,
+      postedAt: new Date(),
+      companyLogo: insertJob.companyLogo ?? null,
+      salary: insertJob.salary ?? null
+    };
     this.jobs.set(id, job);
     return job;
   }
@@ -389,7 +431,12 @@ export class MemStorage implements IStorage {
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
     const id = randomUUID();
-    const message: Message = { ...insertMessage, id, createdAt: new Date() };
+    const message: Message = {
+      ...insertMessage,
+      id,
+      createdAt: new Date(),
+      read: insertMessage.read ?? false
+    };
     this.messages.set(id, message);
     return message;
   }
@@ -410,7 +457,13 @@ export class MemStorage implements IStorage {
 
   async createNotification(insertNotification: InsertNotification): Promise<Notification> {
     const id = randomUUID();
-    const notification: Notification = { ...insertNotification, id, createdAt: new Date() };
+    const notification: Notification = {
+      ...insertNotification,
+      id,
+      createdAt: new Date(),
+      read: insertNotification.read ?? false,
+      actorId: insertNotification.actorId ?? null
+    };
     this.notifications.set(id, notification);
     return notification;
   }

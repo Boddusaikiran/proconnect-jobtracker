@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/Home";
 import JobButler from "@/pages/JobButler";
+import JobPipeline from "@/pages/JobPipeline";
 import Jobs from "@/pages/Jobs";
 import Messages from "@/pages/Messages";
 import Network from "@/pages/Network";
@@ -13,20 +14,43 @@ import NotFound from "@/pages/not-found";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Route, Switch } from "wouter";
 import { queryClient } from "./lib/queryClient";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import AuthPage from "@/pages/AuthPage";
+import { Loader2 } from "lucide-react";
+
+function ProtectedRoute({ component: Component, ...rest }: any) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-border" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  return <Component {...rest} />;
+}
 
 function Router() {
   return (
     <>
       <Header />
       <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/network" component={Network} />
-        <Route path="/jobs" component={Jobs} />
-        <Route path="/job-butler" component={JobButler} />
-        <Route path="/docs" component={DocumentationDashboard} />
-        <Route path="/messages" component={Messages} />
-        <Route path="/notifications" component={Notifications} />
-        <Route path="/profile" component={Profile} />
+        <Route path="/auth" component={AuthPage} />
+        <Route path="/" component={() => <ProtectedRoute component={Home} />} />
+        <Route path="/network" component={() => <ProtectedRoute component={Network} />} />
+        <Route path="/jobs" component={() => <ProtectedRoute component={Jobs} />} />
+        <Route path="/pipeline" component={() => <ProtectedRoute component={JobPipeline} />} />
+        <Route path="/job-butler" component={() => <ProtectedRoute component={JobButler} />} />
+        <Route path="/docs" component={() => <ProtectedRoute component={DocumentationDashboard} />} />
+        <Route path="/messages" component={() => <ProtectedRoute component={Messages} />} />
+        <Route path="/notifications" component={() => <ProtectedRoute component={Notifications} />} />
+        <Route path="/profile" component={() => <ProtectedRoute component={Profile} />} />
         <Route component={NotFound} />
       </Switch>
     </>
@@ -36,10 +60,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

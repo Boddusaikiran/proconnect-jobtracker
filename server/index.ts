@@ -4,21 +4,37 @@ import express from "express";
 import path from "path";
 import { registerRoutes } from "./routes";
 import { seedData } from "./seed";
+import { setupAuth } from "./auth";
+import session from "express-session";
+import MemoryStore from "memorystore";
+
+const SessionStore = MemoryStore(session);
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+app.use(
+  session({
+    cookie: { maxAge: 86400000 },
+    store: new SessionStore({
+      checkPeriod: 86400000, // prune expired entries every 24h
+    }),
+    resave: false,
+    saveUninitialized: false,
+    secret: process.env.SESSION_SECRET || "super secret session key",
+  })
+);
+
+setupAuth(app);
 
 const PORT = Number(process.env.PORT) || 5000;
 
 async function startServer() {
   try {
-    console.log("[storage] DATABASE_URL not set, using in-memory storage");
-    await seedData();
-    console.log("✅ Database seeded successfully");
-
     // Register API routes and get the http server (socket.io attached there)
     const httpServer = await registerRoutes(app);
 

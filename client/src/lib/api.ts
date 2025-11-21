@@ -18,7 +18,8 @@ export async function getUser(id: string): Promise<User> {
 }
 
 export async function updateUser(id: string, updates: Partial<User>): Promise<User> {
-  return apiRequest("PATCH", `/api/users/${id}`, updates);
+  const res = await apiRequest("PATCH", `/api/users/${id}`, updates);
+  return res.json();
 }
 
 // Experiences API
@@ -60,11 +61,12 @@ export async function searchJobs(query?: string, location?: string): Promise<Job
 }
 
 export async function applyToJob(userId: string, jobId: string): Promise<JobApplication> {
-  return apiRequest("POST", "/api/applications", {
+  const res = await apiRequest("POST", "/api/applications", {
     userId,
     jobId,
     status: "applied",
   });
+  return res.json();
 }
 
 export async function getApplications(userId: string): Promise<JobApplication[]> {
@@ -73,8 +75,19 @@ export async function getApplications(userId: string): Promise<JobApplication[]>
   return response.json();
 }
 
+export async function createApplication(data: any): Promise<JobApplication> {
+  const res = await apiRequest("POST", "/api/applications", data);
+  return res.json();
+}
+
+export async function updateApplication(id: string, updates: Partial<JobApplication>): Promise<JobApplication> {
+  const res = await apiRequest("PATCH", `/api/applications/${id}`, updates);
+  return res.json();
+}
+
 export async function saveJob(userId: string, jobId: string): Promise<SavedJob> {
-  return apiRequest("POST", "/api/saved-jobs", { userId, jobId });
+  const res = await apiRequest("POST", "/api/saved-jobs", { userId, jobId });
+  return res.json();
 }
 
 export async function unsaveJob(userId: string, jobId: string): Promise<void> {
@@ -96,15 +109,17 @@ export async function getConnections(userId: string, status?: string): Promise<C
 }
 
 export async function createConnection(userId: string, connectedUserId: string): Promise<Connection> {
-  return apiRequest("POST", "/api/connections", {
+  const res = await apiRequest("POST", "/api/connections", {
     userId,
     connectedUserId,
     status: "pending",
   });
+  return res.json();
 }
 
 export async function updateConnection(id: string, status: string): Promise<Connection> {
-  return apiRequest("PATCH", `/api/connections/${id}`, { status });
+  const res = await apiRequest("PATCH", `/api/connections/${id}`, { status });
+  return res.json();
 }
 
 export async function deleteConnection(id: string): Promise<void> {
@@ -125,12 +140,13 @@ export async function getMessages(userId1: string, userId2: string): Promise<Mes
 }
 
 export async function sendMessage(senderId: string, receiverId: string, content: string): Promise<Message> {
-  return apiRequest("POST", "/api/messages", {
+  const res = await apiRequest("POST", "/api/messages", {
     senderId,
     receiverId,
     content,
     read: false,
   });
+  return res.json();
 }
 
 // Notifications API

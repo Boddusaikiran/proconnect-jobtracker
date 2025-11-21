@@ -1,4 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -31,8 +33,9 @@ export default function Home() {
     queryFn: getUsers,
   });
 
-  // Mock posts data (keeping as-is since backend doesn't have posts endpoints)
-  const posts = [
+  const { toast } = useToast();
+  const [postContent, setPostContent] = useState("");
+  const [localPosts, setLocalPosts] = useState([
     {
       id: "1",
       authorId: "user-1",
@@ -41,6 +44,7 @@ export default function Home() {
       likes: 127,
       comments: 23,
       shares: 8,
+      liked: false,
     },
     {
       id: "2",
@@ -50,6 +54,7 @@ export default function Home() {
       likes: 89,
       comments: 15,
       shares: 12,
+      liked: false,
     },
     {
       id: "3",
@@ -59,8 +64,58 @@ export default function Home() {
       likes: 234,
       comments: 47,
       shares: 19,
+      liked: false,
     },
-  ];
+  ]);
+
+  const handlePostSubmit = () => {
+    if (!postContent.trim()) {
+      toast({ title: "Please enter some content", variant: "destructive" });
+      return;
+    }
+
+    const newPost = {
+      id: Date.now().toString(),
+      authorId: CURRENT_USER_ID,
+      time: "Just now",
+      content: postContent,
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      liked: false,
+    };
+
+    setLocalPosts([newPost, ...localPosts]);
+    setPostContent("");
+    toast({ title: "Post created successfully!" });
+  };
+
+  const handleLike = (postId: string) => {
+    setLocalPosts(localPosts.map(post => {
+      if (post.id === postId) {
+        return {
+          ...post,
+          likes: post.liked ? post.likes - 1 : post.likes + 1,
+          liked: !post.liked
+        };
+      }
+      return post;
+    }));
+  };
+
+  const handleShare = (postId: string) => {
+    toast({ title: "Post shared to your network!" });
+    setLocalPosts(localPosts.map(post =>
+      post.id === postId ? { ...post, shares: post.shares + 1 } : post
+    ));
+  };
+
+  const handleComment = (postId: string) => {
+    toast({ title: "Comments coming soon!" });
+  };
+
+  // Mock posts data (keeping as-is since backend doesn't have posts endpoints)
+  const posts = localPosts;
 
   // Create a map of userId to user for quick lookups
   const usersMap = new Map(allUsers.map(user => [user.id, user]));
@@ -202,6 +257,8 @@ export default function Home() {
                     <AvatarFallback>{currentUser?.fullName?.[0] || "U"}</AvatarFallback>
                   </Avatar>
                   <Textarea
+                    value={postContent}
+                    onChange={(e) => setPostContent(e.target.value)}
                     placeholder="Share your thoughts with your network..."
                     className="resize-none min-h-[60px]"
                     data-testid="input-post"
@@ -222,7 +279,7 @@ export default function Home() {
                       <span className="hidden sm:inline">Article</span>
                     </Button>
                   </div>
-                  <Button size="sm" data-testid="button-post-submit">Post</Button>
+                  <Button size="sm" onClick={handlePostSubmit} data-testid="button-post-submit">Post</Button>
                 </div>
               </CardContent>
             </Card>
@@ -233,7 +290,7 @@ export default function Home() {
               const authorName = author?.fullName || "Unknown User";
               const authorHeadline = author?.headline || "Professional";
               const authorInitial = authorName ? authorName[0] : "U";
-              
+
               return (
                 <Card key={post.id} data-testid={`card-post-${post.id}`}>
                   <CardContent className="p-4">
@@ -256,15 +313,33 @@ export default function Home() {
                         </div>
                         <p className="mt-3 text-sm leading-relaxed">{post.content}</p>
                         <div className="flex items-center gap-6 mt-4 pt-3 border-t">
-                          <Button variant="ghost" size="sm" className="gap-2 hover-elevate" data-testid={`button-like-${post.id}`}>
-                            <ThumbsUp className="h-4 w-4" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`gap-2 hover-elevate ${post.liked ? 'text-primary' : ''}`}
+                            onClick={() => handleLike(post.id)}
+                            data-testid={`button-like-${post.id}`}
+                          >
+                            <ThumbsUp className={`h-4 w-4 ${post.liked ? 'fill-current' : ''}`} />
                             <span className="text-sm">{post.likes}</span>
                           </Button>
-                          <Button variant="ghost" size="sm" className="gap-2 hover-elevate" data-testid={`button-comment-${post.id}`}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-2 hover-elevate"
+                            onClick={() => handleComment(post.id)}
+                            data-testid={`button-comment-${post.id}`}
+                          >
                             <MessageCircle className="h-4 w-4" />
                             <span className="text-sm">{post.comments}</span>
                           </Button>
-                          <Button variant="ghost" size="sm" className="gap-2 hover-elevate" data-testid={`button-share-${post.id}`}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-2 hover-elevate"
+                            onClick={() => handleShare(post.id)}
+                            data-testid={`button-share-${post.id}`}
+                          >
                             <Share2 className="h-4 w-4" />
                             <span className="text-sm">{post.shares}</span>
                           </Button>

@@ -137,6 +137,7 @@ io.on('connection', (socket) => {
 });
 
 app.get('/', (req, res) => {
+<<<<<<< HEAD
    res.setHeader('Content-Type', 'text/html');
    res.send(`
 <!doctype html>
@@ -355,6 +356,9 @@ app.get('/', (req, res) => {
   </body>
 </html>
 `);
+=======
+   res.send('<html><body><h3>JobTracker ESM Demo - visit /api/jobs</h3></body></html>');
+>>>>>>> 0ab2f880c0d0fcb58c0d8007ac68048f09d17ff8
 });
 
 (function seed() {

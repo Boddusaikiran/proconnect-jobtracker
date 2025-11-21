@@ -1,7 +1,11 @@
 import cors from "cors";
+import dotenv from "dotenv";
 import express from "express";
 import path from "path";
+import { registerRoutes } from "./routes";
 import { seedData } from "./seed";
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -14,6 +18,9 @@ async function startServer() {
     console.log("[storage] DATABASE_URL not set, using in-memory storage");
     await seedData();
     console.log("✅ Database seeded successfully");
+
+    // Register API routes and get the http server (socket.io attached there)
+    const httpServer = await registerRoutes(app);
 
     // Serve static files from client directory
     const clientPath = path.join(process.cwd(), "client");
@@ -31,7 +38,7 @@ async function startServer() {
       });
     });
 
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`🌐 Server running on http://localhost:${PORT}`);
       console.log("👉 Open this link manually in your browser.");
     });

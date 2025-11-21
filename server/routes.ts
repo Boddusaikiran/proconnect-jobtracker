@@ -465,10 +465,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { message } = req.body as { message?: string };
       if (!message) return res.status(400).json({ error: "Missing message" });
 
-      // If an external AI provider is configured you could forward the message.
-      // For now return a simple echo/placeholder reply so the UI works without extra deps.
-      const reply = `Echo: ${message}`;
-      res.json({ reply });
+      const OPENAI_KEY = process.env.OPENAI_API_KEY;
+      if (!OPENAI_KEY) {
+        // fallback: echo
+        const reply = `Echo: ${message}`;
+        return res.json({ reply });
+      }
+
+      // Call OpenAI Chat Completions
+      try {
+        const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENAI_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-3.5-turbo",
+            messages: [
+              { role: "system", content: "You are JobTracker AI assistant. Answer helpfully and concisely." },
+              { role: "user", content: message },
+            ],
+            temperature: 0.2,
+            max_tokens: 800,
+          }),
+        });
+
+        if (!resp.ok) {
+          const text = await resp.text();
+          return res.status(502).json({ error: "OpenAI error", details: text });
+        }
+
+        const data = await resp.json();
+        const reply = data?.choices?.[0]?.message?.content ?? data?.error?.message ?? "(no reply)";
+        return res.json({ reply });
+      } catch (err: any) {
+        return res.status(502).json({ error: err.message || "OpenAI request failed" });
+      }
     } catch (err: any) {
       res.status(500).json({ error: err.message || "AI chat failed" });
     }

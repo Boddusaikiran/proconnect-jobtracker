@@ -1,5 +1,5 @@
 import { queryClient, apiRequest } from "./queryClient";
-import type { User, Job, Connection, Message, Notification, JobApplication, SavedJob, Experience, Education, Skill } from "@shared/schema";
+import type { User, Job, Connection, Message, Notification, JobApplication, SavedJob, Experience, Education, Skill, PipelineColumn } from "@shared/schema";
 
 // Current user ID (hardcoded for MVP - in production would come from auth)
 export const CURRENT_USER_ID = "current-user-id";
@@ -162,4 +162,25 @@ export async function markNotificationAsRead(id: string): Promise<void> {
 
 export async function markAllNotificationsAsRead(userId: string): Promise<void> {
   await apiRequest("PATCH", `/api/users/${userId}/notifications/read-all`, undefined);
+}
+
+// Pipeline Columns API
+export async function getPipelineColumns(): Promise<PipelineColumn[]> {
+  const response = await fetch("/api/pipeline-columns");
+  if (!response.ok) throw new Error("Failed to fetch pipeline columns");
+  return response.json();
+}
+
+export async function createPipelineColumn(data: any): Promise<PipelineColumn> {
+  const res = await apiRequest("POST", "/api/pipeline-columns", data);
+  return res.json();
+}
+
+export async function updatePipelineColumn(id: string, updates: Partial<PipelineColumn>): Promise<PipelineColumn> {
+  const res = await apiRequest("PATCH", `/api/pipeline-columns/${id}`, updates);
+  return res.json();
+}
+
+export async function deletePipelineColumn(id: string): Promise<void> {
+  await apiRequest("DELETE", `/api/pipeline-columns/${id}`, undefined);
 }

@@ -22,6 +22,7 @@ import mammoth from "mammoth";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const pdf = require("pdf-parse");
+import { insertPipelineColumnSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Users
@@ -111,11 +112,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/experiences/:id", async (req, res) => {
-    const deleted = await storage.deleteExperience(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ error: "Experience not found" });
-    }
-    res.status(204).send();
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    await storage.deleteExperience(req.params.id);
+    res.sendStatus(200);
   });
 
   // Education
@@ -143,11 +142,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/education/:id", async (req, res) => {
-    const deleted = await storage.deleteEducation(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ error: "Education not found" });
-    }
-    res.status(204).send();
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    await storage.deleteEducation(req.params.id);
+    res.sendStatus(200);
   });
 
   // Skills
@@ -175,11 +172,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/skills/:id", async (req, res) => {
-    const deleted = await storage.deleteSkill(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ error: "Skill not found" });
-    }
-    res.status(204).send();
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    await storage.deleteSkill(req.params.id);
+    res.sendStatus(200);
   });
 
   // Connections
@@ -230,11 +225,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/connections/:id", async (req, res) => {
-    const deleted = await storage.deleteConnection(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ error: "Connection not found" });
-    }
-    res.status(204).send();
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    await storage.deleteConnection(req.params.id);
+    res.sendStatus(200);
   });
 
   app.get("/api/mutual-connections/:userId1/:userId2", async (req, res) => {
@@ -353,12 +346,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/users/:userId/saved-jobs/:jobId", async (req, res) => {
-    const deleted = await storage.deleteSavedJob(req.params.userId, req.params.jobId);
-    if (!deleted) {
-      return res.status(404).json({ error: "Saved job not found" });
-    }
-    res.status(204).send();
+  app.delete("/api/saved-jobs/:jobId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    await storage.deleteSavedJob(req.user!.id, req.params.jobId);
+    res.sendStatus(200);
   });
 
   // Messages
@@ -523,56 +514,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         analysis
       });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || "Upload failed" });
-    }
-  });
-
-  // Notifications
-  app.get("/api/users/:userId/notifications", async (req, res) => {
-    const notifications = await storage.getNotifications(req.params.userId);
-    res.json(notifications);
-  });
-
-  app.post("/api/notifications", async (req, res) => {
-    try {
-      const notifData = insertNotificationSchema.parse(req.body);
-      const notification = await storage.createNotification(notifData);
-      res.status(201).json(notification);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid notification data" });
-    }
-  });
-
-  app.patch("/api/notifications/:id/read", async (req, res) => {
-    const marked = await storage.markNotificationAsRead(req.params.id);
-    if (!marked) {
-      return res.status(404).json({ error: "Notification not found" });
-    }
-    res.status(204).send();
-  });
-
-  app.patch("/api/users/:userId/notifications/read-all", async (req, res) => {
-    await storage.markAllNotificationsAsRead(req.params.userId);
-    res.status(204).send();
-  });
-
-  const httpServer = createServer(app);
-
-  // Attach Socket.IO to the HTTP server and expose via app for route handlers
-  try {
-    const io = new IOServer(httpServer, { cors: { origin: '*' } });
-    (app as any)._io = io;
-    io.on('connection', (socket: any) => {
-      socket.on('identify', (userId: string) => {
-        socket.join(userId);
+      // Notifications
+      app.get("/api/users/:userId/notifications", async (req, res) => {
+        const notifications = await storage.getNotifications(req.params.userId);
+        res.json(notifications);
       });
-      socket.on('ping', (data: any) => {
-        socket.emit('pong', { at: new Date().toISOString(), data });
-      });
-    });
-  } catch (e) {
-    // ignore if socket.io cannot be attached
-  }
 
-  return httpServer;
-}
+      app.post("/api/notifications", async (req, res) => {
+        try {
+          const notifData = insertNotificationSchema.parse(req.body);
+          const notification = await storage.createNotification(notifData);
+          res.status(201).json(notification);
+        } catch (error) {
+          res.status(400).json({ error: "Invalid notification data" });
+        }
+      });
+
+      app.patch("/api/notifications/:id/read", async (req, res) => {
+        const marked = await storage.markNotificationAsRead(req.params.id);
+        if (!marked) {
+          return res.status(404).json({ error: "Notification not found" });
+        }
+        res.status(204).send();
+      });
+
+      app.patch("/api/users/:userId/notifications/read-all", async (req, res) => {
+        await storage.markAllNotificationsAsRead(req.params.userId);
+        res.status(204).send();
+      });
+
+      const httpServer = createServer(app);
+
+      // Attach Socket.IO to the HTTP server and expose via app for route handlers
+      try {
+        const io = new IOServer(httpServer, { cors: { origin: '*' } });
+        (app as any)._io = io;
+        io.on('connection', (socket: any) => {
+          socket.on('identify', (userId: string) => {
+            socket.join(userId);
+          });
+          socket.on('ping', (data: any) => {
+            socket.emit('pong', { at: new Date().toISOString(), data });
+          });
+        });
+      } catch (e) {
+        // ignore if socket.io cannot be attached
+      }
+
+      return httpServer;
+    }

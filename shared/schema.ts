@@ -108,6 +108,14 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const pipelineColumns = pgTable("pipeline_columns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  order: integer("order").notNull(),
+  color: text("color").default("bg-gray-500/10 text-gray-500"),
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -156,6 +164,10 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 });
 
+export const insertPipelineColumnSchema = createInsertSchema(pipelineColumns).omit({
+  id: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -186,3 +198,6 @@ export type InsertMessage = z.infer<typeof insertMessageSchema>;
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export type PipelineColumn = typeof pipelineColumns.$inferSelect;
+export type InsertPipelineColumn = z.infer<typeof insertPipelineColumnSchema>;

@@ -1,5 +1,8 @@
 import { and, asc, desc, eq, ilike, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { db } from "./db";
+import session from "express-session";
+import createMemoryStore from "memorystore";
 import { Pool } from 'pg';
 import {
    connections,
@@ -9,25 +12,34 @@ import {
    jobs,
    messages,
    notifications,
+   pipelineColumns, // Added
    savedJobs,
    skills,
    users,
    type InsertJob,
    type InsertJobApplication,
    type InsertMessage,
+   type Notification as AppNotification,
    type InsertNotification,
    type InsertUser,
+   type PipelineColumn, // Added
+   type InsertPipelineColumn, // Added
 } from '../shared/schema';
 import type {
    IStorage,
 } from './storage';
 
-export class DrizzleStorage implements IStorage {
-   private db: ReturnType<typeof drizzle>;
+const MemoryStore = createMemoryStore(session);
 
-   constructor(databaseUrl: string) {
-      const pool = new Pool({ connectionString: databaseUrl });
-      this.db = drizzle(pool);
+export class DrizzleStorage implements IStorage {
+   sessionStore: session.Store; // Added
+   db: typeof db; // Changed type
+
+   constructor() { // Changed constructor signature and implementation
+      this.db = db;
+      this.sessionStore = new MemoryStore({
+         checkPeriod: 86400000,
+      });
    }
 
    // Users
@@ -76,9 +88,8 @@ export class DrizzleStorage implements IStorage {
       return row;
    }
 
-   async deleteExperience(id: string) {
-      const res = await this.db.delete(experiences).where(eq(experiences.id, id));
-      return (res.rowCount ?? 0) > 0;
+   async deleteExperience(id: string): Promise<void> { // Changed return type and implementation
+      await this.db.delete(experiences).where(eq(experiences.id, id));
    }
 
    // Education
@@ -97,9 +108,8 @@ export class DrizzleStorage implements IStorage {
       return row;
    }
 
-   async deleteEducation(id: string) {
-      const res = await this.db.delete(education).where(eq(education.id, id));
-      return (res.rowCount ?? 0) > 0;
+   async deleteEducation(id: string): Promise<void> { // Changed return type and implementation
+      await this.db.delete(education).where(eq(education.id, id));
    }
 
    // Skills
@@ -118,9 +128,8 @@ export class DrizzleStorage implements IStorage {
       return row;
    }
 
-   async deleteSkill(id: string) {
-      const res = await this.db.delete(skills).where(eq(skills.id, id));
-      return (res.rowCount ?? 0) > 0;
+   async deleteSkill(id: string): Promise<void> { // Changed return type and implementation
+      await this.db.delete(skills).where(eq(skills.id, id));
    }
 
    // Connections (basic)
@@ -134,15 +143,14 @@ export class DrizzleStorage implements IStorage {
       return row;
    }
 
-   async updateConnection(id: string, updates: Partial<any>) {
-      await this.db.update(connections).set(updates).where(eq(connections.id, id));
+   async updateConnection(id: string, status: string) {
+      await this.db.update(connections).set({ status }).where(eq(connections.id, id));
       const [row] = await this.db.select().from(connections).where(eq(connections.id, id));
       return row;
    }
 
-   async deleteConnection(id: string) {
-      const res = await this.db.delete(connections).where(eq(connections.id, id));
-      return (res.rowCount ?? 0) > 0;
+   async deleteConnection(id: string): Promise<void> { // Changed return type and implementation
+      await this.db.delete(connections).where(eq(connections.id, id));
    }
 
    async getMutualConnectionsCount(userId1: string, userId2: string) {
@@ -203,9 +211,10 @@ export class DrizzleStorage implements IStorage {
       return row;
    }
 
-   async deleteSavedJob(userId: string, jobId: string) {
-      const res = await this.db.delete(savedJobs).where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, jobId)));
-      return (res.rowCount ?? 0) > 0;
+   async deleteSavedJob(userId: string, jobId: string): Promise<void> { // Changed return type and implementation
+      await this.db
+         .delete(savedJobs)
+         .where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, jobId)));
    }
 
    async isSavedJob(userId: string, jobId: string) {
@@ -238,24 +247,81 @@ export class DrizzleStorage implements IStorage {
       return true;
    }
 
+   async markMessagesAsRead(senderId: string, receiverId: string): Promise<void> { // Added
+      await this.db
+         .update(messages)
+         .set({ read: true })
+         .where(
+            and(
+               eq(messages.senderId, senderId), // Changed from fromId
+               eq(messages.receiverId, receiverId), // Changed from toId
+               eq(messages.read, false)
+            )
+         );
+   }
+
    // Notifications
-   async getNotifications(userId: string) {
-      return await this.db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
+   async getNotifications(userId: string): Promise<AppNotification[]> { // Changed return type
+      return await this.db
+         .select()
+         .from(notifications)
+         .where(eq(notifications.userId, userId))
+         .orderBy(desc(notifications.createdAt));
    }
 
-   async createNotification(notification: InsertNotification) {
-      const [row] = await this.db.insert(notifications).values(notification).returning();
-      return row;
+   async createNotification(notification: InsertNotification): Promise<AppNotification> { // Changed return type and variable name
+      const [newNotification] = await this.db
+         .insert(notifications)
+         .values(notification)
+         .returning();
+      return newNotification;
    }
 
-   async markNotificationAsRead(id: string) {
-      await this.db.update(notifications).set({ read: true }).where(eq(notifications.id, id));
+   async markNotificationAsRead(id: string): Promise<AppNotification | undefined> {
+      const [notification] = await this.db
+         .update(notifications)
+         .set({ read: true })
+         .where(eq(notifications.id, id))
+         .returning();
+      return notification;
+   }
+
+   async markAllNotificationsAsRead(userId: string): Promise<boolean> {
+      await this.db
+         .update(notifications)
+         .set({ read: true })
+         .where(eq(notifications.userId, userId));
       return true;
    }
 
-   async markAllNotificationsAsRead(userId: string) {
-      await this.db.update(notifications).set({ read: true }).where(eq(notifications.userId, userId));
-      return true;
+   // Pipeline Columns
+   async getPipelineColumns(userId: string): Promise<PipelineColumn[]> {
+      return await this.db
+         .select()
+         .from(pipelineColumns)
+         .where(eq(pipelineColumns.userId, userId))
+         .orderBy(pipelineColumns.order);
+   }
+
+   async createPipelineColumn(column: InsertPipelineColumn): Promise<PipelineColumn> {
+      const [newColumn] = await this.db
+         .insert(pipelineColumns)
+         .values(column)
+         .returning();
+      return newColumn;
+   }
+
+   async updatePipelineColumn(id: string, updates: Partial<PipelineColumn>): Promise<PipelineColumn | undefined> {
+      const [updatedColumn] = await this.db
+         .update(pipelineColumns)
+         .set(updates)
+         .where(eq(pipelineColumns.id, id))
+         .returning();
+      return updatedColumn;
+   }
+
+   async deletePipelineColumn(id: string): Promise<void> {
+      await this.db.delete(pipelineColumns).where(eq(pipelineColumns.id, id));
    }
 }
 

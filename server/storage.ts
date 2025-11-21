@@ -1,29 +1,38 @@
 import {
-  type Connection,
-  type Education,
-  type Experience,
-  type InsertConnection,
-  type InsertEducation,
-  type InsertExperience,
-  type InsertJob,
-  type InsertJobApplication,
-  type InsertMessage,
-  type InsertNotification,
-  type InsertSavedJob,
-  type InsertSkill,
-  type InsertUser,
-  type Job,
-  type JobApplication,
-  type Message,
-  type Notification,
-  type SavedJob,
-  type Skill,
+  users,
   type User,
+  type InsertUser,
+  type Experience,
+  type InsertExperience,
+  type Education,
+  type InsertEducation,
+  type Skill,
+  type InsertSkill,
+  type Connection,
+  type InsertConnection,
+  type Job,
+  type InsertJob,
+  type JobApplication,
+  type InsertJobApplication,
+  type SavedJob,
+  type InsertSavedJob,
+  type Message,
+  type InsertMessage,
+  type Notification as AppNotification,
+  type InsertNotification,
+  type PipelineColumn,
+  type InsertPipelineColumn,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import DrizzleStorage from './drizzleStorage';
+import session from "express-session";
+import createMemoryStore from "memorystore";
+
+const MemoryStore = createMemoryStore(session);
 
 export interface IStorage {
+  sessionStore: session.Store;
+
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -36,25 +45,25 @@ export interface IStorage {
   getExperiences(userId: string): Promise<Experience[]>;
   createExperience(experience: InsertExperience): Promise<Experience>;
   updateExperience(id: string, updates: Partial<Experience>): Promise<Experience | undefined>;
-  deleteExperience(id: string): Promise<boolean>;
+  deleteExperience(id: string): Promise<void>;
 
   // Education
   getEducation(userId: string): Promise<Education[]>;
   createEducation(education: InsertEducation): Promise<Education>;
   updateEducation(id: string, updates: Partial<Education>): Promise<Education | undefined>;
-  deleteEducation(id: string): Promise<boolean>;
+  deleteEducation(id: string): Promise<void>;
 
   // Skills
   getSkills(userId: string): Promise<Skill[]>;
   createSkill(skill: InsertSkill): Promise<Skill>;
   updateSkill(id: string, updates: Partial<Skill>): Promise<Skill | undefined>;
-  deleteSkill(id: string): Promise<boolean>;
+  deleteSkill(id: string): Promise<void>;
 
   // Connections
   getConnections(userId: string, status?: string): Promise<Connection[]>;
   createConnection(connection: InsertConnection): Promise<Connection>;
-  updateConnection(id: string, updates: Partial<Connection>): Promise<Connection | undefined>;
-  deleteConnection(id: string): Promise<boolean>;
+  updateConnection(id: string, status: string): Promise<Connection | undefined>;
+  deleteConnection(id: string): Promise<void>;
   getMutualConnectionsCount(userId1: string, userId2: string): Promise<number>;
 
   // Jobs
@@ -72,7 +81,7 @@ export interface IStorage {
   // Saved Jobs
   getSavedJobs(userId: string): Promise<SavedJob[]>;
   createSavedJob(savedJob: InsertSavedJob): Promise<SavedJob>;
-  deleteSavedJob(userId: string, jobId: string): Promise<boolean>;
+  deleteSavedJob(userId: string, jobId: string): Promise<void>;
   isSavedJob(userId: string, jobId: string): Promise<boolean>;
 
   // Messages
@@ -80,15 +89,23 @@ export interface IStorage {
   getMessages(userId1: string, userId2: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
   markMessageAsRead(id: string): Promise<boolean>;
+  markMessagesAsRead(senderId: string, receiverId: string): Promise<void>;
 
   // Notifications
-  getNotifications(userId: string): Promise<Notification[]>;
-  createNotification(notification: InsertNotification): Promise<Notification>;
-  markNotificationAsRead(id: string): Promise<boolean>;
+  getNotifications(userId: string): Promise<AppNotification[]>;
+  createNotification(notification: InsertNotification): Promise<AppNotification>;
+  markNotificationAsRead(id: string): Promise<AppNotification | undefined>;
   markAllNotificationsAsRead(userId: string): Promise<boolean>;
+
+  // Pipeline Columns
+  getPipelineColumns(userId: string): Promise<PipelineColumn[]>;
+  createPipelineColumn(column: InsertPipelineColumn): Promise<PipelineColumn>;
+  updatePipelineColumn(id: string, updates: Partial<PipelineColumn>): Promise<PipelineColumn | undefined>;
+  deletePipelineColumn(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
+  sessionStore: session.Store;
   private users: Map<string, User>;
   private experiences: Map<string, Experience>;
   private education: Map<string, Education>;
@@ -98,7 +115,9 @@ export class MemStorage implements IStorage {
   private jobApplications: Map<string, JobApplication>;
   private savedJobs: Map<string, SavedJob>;
   private messages: Map<string, Message>;
-  private notifications: Map<string, Notification>;
+  private notifications: Map<string, AppNotification>;
+  private pipelineColumns: Map<string, PipelineColumn>;
+  private currentId: number;
 
   constructor() {
     this.users = new Map();
@@ -111,6 +130,11 @@ export class MemStorage implements IStorage {
     this.savedJobs = new Map();
     this.messages = new Map();
     this.notifications = new Map();
+    this.pipelineColumns = new Map();
+    this.currentId = 1;
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000,
+    });
   }
 
   // Users
@@ -191,8 +215,8 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async deleteExperience(id: string): Promise<boolean> {
-    return this.experiences.delete(id);
+  async deleteExperience(id: string): Promise<void> {
+    this.experiences.delete(id);
   }
 
   // Education
@@ -222,8 +246,8 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async deleteEducation(id: string): Promise<boolean> {
-    return this.education.delete(id);
+  async deleteEducation(id: string): Promise<void> {
+    this.education.delete(id);
   }
 
   // Skills
@@ -252,8 +276,8 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async deleteSkill(id: string): Promise<boolean> {
-    return this.skills.delete(id);
+  async deleteSkill(id: string): Promise<void> {
+    this.skills.delete(id);
   }
 
   // Connections
@@ -272,16 +296,16 @@ export class MemStorage implements IStorage {
     return connection;
   }
 
-  async updateConnection(id: string, updates: Partial<Connection>): Promise<Connection | undefined> {
+  async updateConnection(id: string, status: string): Promise<Connection | undefined> {
     const connection = this.connections.get(id);
     if (!connection) return undefined;
-    const updated = { ...connection, ...updates };
+    const updated = { ...connection, status };
     this.connections.set(id, updated);
     return updated;
   }
 
-  async deleteConnection(id: string): Promise<boolean> {
-    return this.connections.delete(id);
+  async deleteConnection(id: string): Promise<void> {
+    this.connections.delete(id);
   }
 
   async getMutualConnectionsCount(userId1: string, userId2: string): Promise<number> {
@@ -385,12 +409,15 @@ export class MemStorage implements IStorage {
     return savedJob;
   }
 
-  async deleteSavedJob(userId: string, jobId: string): Promise<boolean> {
-    const savedJob = Array.from(this.savedJobs.values()).find(
-      (saved) => saved.userId === userId && saved.jobId === jobId,
-    );
-    if (!savedJob) return false;
-    return this.savedJobs.delete(savedJob.id);
+  async deleteSavedJob(userId: string, jobId: string): Promise<void> {
+    // In a real DB we would delete by compound key.
+    // For map, we iterate (inefficient but fine for mem)
+    for (const [key, val] of Array.from(this.savedJobs.entries())) {
+      if (val.userId === userId && val.jobId === jobId) {
+        this.savedJobs.delete(key);
+        break;
+      }
+    }
   }
 
   async isSavedJob(userId: string, jobId: string): Promise<boolean> {
@@ -448,46 +475,85 @@ export class MemStorage implements IStorage {
     return true;
   }
 
-  // Notifications
-  async getNotifications(userId: string): Promise<Notification[]> {
-    return Array.from(this.notifications.values())
-      .filter((notif) => notif.userId === userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  async markMessagesAsRead(senderId: string, receiverId: string): Promise<void> {
+    for (const msg of Array.from(this.messages.values())) {
+      if (msg.senderId === senderId && msg.receiverId === receiverId && !msg.read) {
+        const updated = { ...msg, read: true };
+        this.messages.set(msg.id, updated);
+      }
+    }
   }
 
-  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
-    const id = randomUUID();
-    const notification: Notification = {
+  // Notifications
+  async getNotifications(userId: string): Promise<AppNotification[]> {
+    return Array.from(this.notifications.values()).filter(
+      (n) => n.userId === userId,
+    );
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<AppNotification> {
+    const id = randomUUID(); // Assuming randomUUID() is used for IDs, not this.currentId++
+    const notification: AppNotification = {
       ...insertNotification,
       id,
       createdAt: new Date(),
       read: insertNotification.read ?? false,
-      actorId: insertNotification.actorId ?? null
+      actorId: insertNotification.actorId ?? null,
     };
     this.notifications.set(id, notification);
     return notification;
   }
 
-  async markNotificationAsRead(id: string): Promise<boolean> {
+  async markNotificationAsRead(id: string): Promise<AppNotification | undefined> {
     const notification = this.notifications.get(id);
-    if (!notification) return false;
-    notification.read = true;
-    return true;
+    if (!notification) return undefined;
+    const updated = { ...notification, read: true };
+    this.notifications.set(id, updated);
+    return updated;
   }
 
   async markAllNotificationsAsRead(userId: string): Promise<boolean> {
-    const userNotifications = await this.getNotifications(userId);
+    const userNotifications = Array.from(this.notifications.values()).filter(
+      (n) => n.userId === userId,
+    );
     userNotifications.forEach((notif) => {
-      notif.read = true;
+      const updated = { ...notif, read: true };
+      this.notifications.set(notif.id, updated);
     });
     return true;
+  }
+
+  // Pipeline Columns
+  async getPipelineColumns(userId: string): Promise<PipelineColumn[]> {
+    return Array.from(this.pipelineColumns.values())
+      .filter((col) => col.userId === userId)
+      .sort((a, b) => a.order - b.order);
+  }
+
+  async createPipelineColumn(column: InsertPipelineColumn): Promise<PipelineColumn> {
+    const id = this.currentId++;
+    const newColumn: PipelineColumn = { ...column, id: id.toString(), color: column.color || "bg-gray-500/10 text-gray-500" };
+    this.pipelineColumns.set(newColumn.id, newColumn);
+    return newColumn;
+  }
+
+  async updatePipelineColumn(id: string, updates: Partial<PipelineColumn>): Promise<PipelineColumn | undefined> {
+    const column = this.pipelineColumns.get(id);
+    if (!column) return undefined;
+    const updated = { ...column, ...updates };
+    this.pipelineColumns.set(id, updated);
+    return updated;
+  }
+
+  async deletePipelineColumn(id: string): Promise<void> {
+    this.pipelineColumns.delete(id);
   }
 }
 
 let storageImpl: IStorage;
 if (process.env.DATABASE_URL) {
   try {
-    storageImpl = new DrizzleStorage(process.env.DATABASE_URL);
+    storageImpl = new DrizzleStorage();
     console.log('[storage] Using Drizzle (Postgres) storage');
   } catch (err) {
     console.error('[storage] Failed to initialize DrizzleStorage, falling back to MemStorage', err);

@@ -14,6 +14,7 @@ import bcrypt from "bcryptjs";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import jwt from "jsonwebtoken";
+import multer from "multer";
 import { Server as IOServer } from "socket.io";
 import { storage } from "./storage";
 
@@ -455,6 +456,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(message);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to send message" });
+    }
+  });
+
+  // Simple AI chat endpoint (MVP)
+  app.post("/api/ai/chat", async (req, res) => {
+    try {
+      const { message } = req.body as { message?: string };
+      if (!message) return res.status(400).json({ error: "Missing message" });
+
+      // If an external AI provider is configured you could forward the message.
+      // For now return a simple echo/placeholder reply so the UI works without extra deps.
+      const reply = `Echo: ${message}`;
+      res.json({ reply });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "AI chat failed" });
+    }
+  });
+
+  // Resume upload endpoint (accepts multipart/form-data files)
+  const upload = multer({ storage: multer.memoryStorage() });
+  app.post("/api/upload-resume", upload.array("files"), async (req, res) => {
+    try {
+      const files = (req as any).files || [];
+      const metas = files.map((f: any) => ({ name: f.originalname, size: f.size, mime: f.mimetype }));
+
+      // TODO: parse files for text/structured data using a parser (pdf-parse, mammoth, etc.)
+      // For MVP we just return the received metadata.
+      res.json({ message: "uploaded", files: metas });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Upload failed" });
     }
   });
 

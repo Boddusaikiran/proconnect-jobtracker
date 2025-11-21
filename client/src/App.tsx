@@ -1,3 +1,4 @@
+import DocumentationDashboard from "@/components/DocumentationDashboard";
 import { Header } from "@/components/Header";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +23,7 @@ function Router() {
         <Route path="/network" component={Network} />
         <Route path="/jobs" component={Jobs} />
         <Route path="/job-butler" component={JobButler} />
+        <Route path="/docs" component={DocumentationDashboard} />
         <Route path="/messages" component={Messages} />
         <Route path="/notifications" component={Notifications} />
         <Route path="/profile" component={Profile} />

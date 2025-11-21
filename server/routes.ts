@@ -17,6 +17,11 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import { Server as IOServer } from "socket.io";
 import { storage } from "./storage";
+import { generateMessage, analyzeResume, chatWithAI } from "./ai";
+import mammoth from "mammoth";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdf = require("pdf-parse");
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Users
@@ -492,14 +497,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Resume upload endpoint (accepts multipart/form-data files)
   const upload = multer({ storage: multer.memoryStorage() });
-  app.post("/api/upload-resume", upload.array("files"), async (req, res) => {
+  app.post("/api/upload-resume", upload.single("file"), async (req, res) => {
     try {
-      const files = (req as any).files || [];
-      const metas = files.map((f: any) => ({ name: f.originalname, size: f.size, mime: f.mimetype }));
+      const file = (req as any).file;
+      if (!file) return res.status(400).json({ error: "No file uploaded" });
 
-      // TODO: parse files for text/structured data using a parser (pdf-parse, mammoth, etc.)
-      // For MVP we just return the received metadata.
-      res.json({ message: "uploaded", files: metas });
+      let text = "";
+      if (file.mimetype === "application/pdf") {
+        const data = await pdf(file.buffer);
+        text = data.text;
+      } else if (file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        const result = await mammoth.extractRawText({ buffer: file.buffer });
+        text = result.value;
+      } else {
+        return res.status(400).json({ error: "Unsupported file type. Please upload PDF or DOCX." });
+      }
+
+      // Analyze with AI
+      const analysis = await analyzeResume(text);
+
+      res.json({
+        message: "uploaded",
+        filename: file.originalname,
+        textPreview: text.substring(0, 200) + "...",
+        analysis
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Upload failed" });
     }

@@ -5,11 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  MapPin, Mail, Edit, Plus, Briefcase, GraduationCap, 
-  Award, Calendar 
+import {
+  MapPin, Mail, Edit, Plus, Briefcase, GraduationCap,
+  Award, Calendar
 } from "lucide-react";
 import { getUser, getExperiences, getEducation, getSkills, CURRENT_USER_ID, getConnections } from "@/lib/api";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { Upload, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 export default function Profile() {
   const { data: user, isLoading: userLoading } = useQuery({
@@ -36,6 +40,33 @@ export default function Profile() {
     queryKey: ["/api/users", CURRENT_USER_ID, "connections"],
     queryFn: () => getConnections(CURRENT_USER_ID, "accepted"),
   });
+
+  const { toast } = useToast();
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [analysis, setAnalysis] = useState<any>(null);
+
+  const handleUpload = async () => {
+    if (!resumeFile) return;
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", resumeFile);
+
+    try {
+      const res = await fetch("/api/upload-resume", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setAnalysis(data.analysis);
+      toast({ title: "Resume analyzed successfully!", description: "Check out the AI insights below." });
+    } catch (error) {
+      toast({ title: "Upload failed", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   if (userLoading) {
     return (
@@ -144,6 +175,83 @@ export default function Profile() {
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                <h2 className="text-xl font-bold">Resume & AI Analysis</h2>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="grid w-full max-w-sm items-center gap-1.5">
+                  <input
+                    type="file"
+                    accept=".pdf,.docx"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+                <Button onClick={handleUpload} disabled={!resumeFile || isUploading}>
+                  {isUploading ? (
+                    <>Uploading...</>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Analyze Resume
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {analysis && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <Separator />
+
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <Award className="h-4 w-4 text-primary" />
+                        ATS Score
+                      </h3>
+                      <div className="flex items-center gap-4">
+                        <Progress value={analysis.score} className="h-3" />
+                        <span className="font-bold text-lg">{analysis.score}/100</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{analysis.summary}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-yellow-500" />
+                        Missing Keywords
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {analysis.missingKeywords?.map((kw: string, i: number) => (
+                          <Badge key={i} variant="outline" className="border-yellow-500/50 text-yellow-600 bg-yellow-50">
+                            {kw}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Improvement Suggestions
+                    </h3>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      {analysis.suggestions?.map((s: string, i: number) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -315,7 +423,7 @@ export default function Profile() {
                       data-testid={`skill-${skill.id}`}
                     >
                       {skill.name}
-                      {skill.endorsements !== undefined && skill.endorsements > 0 && (
+                      {skill.endorsements !== undefined && skill.endorsements !== null && skill.endorsements > 0 && (
                         <span className="ml-2 text-xs text-muted-foreground">
                           {skill.endorsements}
                         </span>

@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Bell, Briefcase, FileText, Home, Menu, MessageSquare, Search, User, Users } from "lucide-react";
+import { Bell, Briefcase, FileText, Home, Menu, MessageSquare, Search, Terminal, User, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -26,6 +26,7 @@ export function Header() {
     { path: "/docs", icon: FileText, label: "Docs" },
     { path: "/messages", icon: MessageSquare, label: "Messages" },
     { path: "/notifications", icon: Bell, label: "Notifications" },
+    { path: "/coding", icon: Terminal, label: "Coding" },
   ];
 
   const isActive = (path: string) => location === path;

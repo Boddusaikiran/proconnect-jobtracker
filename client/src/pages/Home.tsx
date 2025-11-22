@@ -130,7 +130,7 @@ export default function Home() {
   // Loading state
   if (userLoading || connectionsLoading || usersLoading) {
     return (
-      <div className="min-h-screen bg-muted/30">
+      <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-success/10">
         <div className="container mx-auto px-4 py-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <aside className="lg:col-span-3 space-y-4">
@@ -188,13 +188,13 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-success/10">
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <aside className="lg:col-span-3 space-y-4">
-            <Card>
+            <Card className="shadow-lg hover:shadow-xl transition-shadow border-primary/20">
               <CardContent className="p-0">
-                <div className="h-16 bg-gradient-to-r from-primary/20 to-primary/10 rounded-t-lg" />
+                <div className="h-16 bg-gradient-to-r from-primary via-primary/80 to-success rounded-t-lg" />
                 <div className="px-4 pb-4">
                   <Avatar className="h-16 w-16 -mt-8 border-4 border-card" data-testid="avatar-current-user">
                     <AvatarImage src={currentUser?.avatarUrl || undefined} />
@@ -223,9 +223,12 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <h3 className="font-semibold text-sm">Trending Topics</h3>
+            <Card className="shadow-lg hover:shadow-xl transition-shadow border-success/20">
+              <CardHeader className="pb-3 bg-gradient-to-r from-success/10 to-primary/10 rounded-t-lg">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  Trending Topics
+                </h3>
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
@@ -249,7 +252,7 @@ export default function Home() {
           </aside>
 
           <main className="lg:col-span-6 space-y-4">
-            <Card>
+            <Card className="shadow-lg hover:shadow-xl transition-shadow border-primary/20">
               <CardContent className="p-4">
                 <div className="flex gap-3">
                   <Avatar data-testid="avatar-post-creator">

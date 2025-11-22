@@ -3,23 +3,29 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { users, type User } from "@shared/schema";
 import { storage } from "./storage";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import bcrypt from "bcryptjs";
+import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import jwt from "jsonwebtoken";
 
 const scryptAsync = promisify(scrypt);
 
-async function hashPassword(password: string) {
-    const salt = randomBytes(16).toString("hex");
-    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-    return `${buf.toString("hex")}.${salt}`;
-}
-
 async function comparePasswords(supplied: string, stored: string) {
-    const [hashed, salt] = stored.split(".");
-    const hashedBuf = Buffer.from(hashed, "hex");
-    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-    return timingSafeEqual(hashedBuf, suppliedBuf);
+    // Check if it's a bcrypt hash (starts with $2a, $2b, $2y)
+    if (stored.startsWith("$")) {
+        return await bcrypt.compare(supplied, stored);
+    }
+
+    // Fallback to legacy scrypt verification
+    try {
+        const [hashed, salt] = stored.split(".");
+        const hashedBuf = Buffer.from(hashed, "hex");
+        const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+        return timingSafeEqual(hashedBuf, suppliedBuf);
+    } catch (e) {
+        console.error("[Auth] Password comparison failed:", e);
+        return false;
+    }
 }
 
 export function setupAuth(app: any) {
@@ -29,17 +35,27 @@ export function setupAuth(app: any) {
     passport.use(
         new LocalStrategy({ usernameField: "email" }, async (email, password, done) => {
             try {
+                console.log(`[Auth] Attempting login for: ${email}`);
                 const user = await storage.getUserByEmail(email);
-                if (!user) return done(null, false, { message: "Invalid credentials" });
+                if (!user) {
+                    console.log("[Auth] User not found");
+                    return done(null, false, { message: "Invalid credentials" });
+                }
 
                 // Check if user has a password (might be Google-only)
-                if (!user.password) return done(null, false, { message: "Please log in with Google" });
+                if (!user.password) {
+                    console.log("[Auth] No password set (Google user)");
+                    return done(null, false, { message: "Please log in with Google" });
+                }
 
+                console.log("[Auth] Verifying password...");
                 const isValid = await comparePasswords(password, user.password);
+                console.log(`[Auth] Password valid: ${isValid}`);
                 if (!isValid) return done(null, false, { message: "Invalid credentials" });
 
                 return done(null, user);
             } catch (err) {
+                console.error("[Auth] Login error:", err);
                 return done(err);
             }
         })

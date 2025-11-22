@@ -17,6 +17,9 @@ import { queryClient } from "./lib/queryClient";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import AuthPage from "@/pages/AuthPage";
 import { Loader2 } from "lucide-react";
+import CustomerCareAI from "@/components/CustomerCareAI";
+import ColorShowcase from "@/pages/ColorShowcase";
+import CompleteCodingPlatform from "@/pages/coding/CompleteCodingPlatform";
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
@@ -42,6 +45,7 @@ function Router() {
       <Header />
       <Switch>
         <Route path="/auth" component={AuthPage} />
+        <Route path="/colors" component={ColorShowcase} />
         <Route path="/" component={() => <ProtectedRoute component={Home} />} />
         <Route path="/network" component={() => <ProtectedRoute component={Network} />} />
         <Route path="/jobs" component={() => <ProtectedRoute component={Jobs} />} />
@@ -51,8 +55,13 @@ function Router() {
         <Route path="/messages" component={() => <ProtectedRoute component={Messages} />} />
         <Route path="/notifications" component={() => <ProtectedRoute component={Notifications} />} />
         <Route path="/profile" component={() => <ProtectedRoute component={Profile} />} />
+        <Route path="/profile" component={() => <ProtectedRoute component={Profile} />} />
+
+        {/* Complete Coding Platform with Debug Console */}
+        <Route path="/coding" component={() => <ProtectedRoute component={CompleteCodingPlatform} />} />
         <Route component={NotFound} />
       </Switch>
+      <CustomerCareAI />
     </>
   );
 }

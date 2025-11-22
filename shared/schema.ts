@@ -116,6 +116,86 @@ export const pipelineColumns = pgTable("pipeline_columns", {
   color: text("color").default("bg-gray-500/10 text-gray-500"),
 });
 
+// Coding Platform Tables
+
+export const codingProblems = pgTable("coding_problems", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description").notNull(),
+  difficulty: text("difficulty").notNull(), // 'easy', 'medium', 'hard'
+  category: text("category").notNull(), // 'Arrays', 'DP', etc.
+  companyTags: text("company_tags").array(), // ['Google', 'Amazon']
+  constraints: text("constraints"),
+  starterCode: text("starter_code").notNull(), // JSON string of { language: code }
+  editorial: text("editorial"), // Solution explanation
+  editorialCode: text("editorial_code"), // JSON string of { language: solution }
+  timeComplexity: text("time_complexity"), // e.g., 'O(n log n)'
+  spaceComplexity: text("space_complexity"), // e.g., 'O(n)'
+  acceptanceRate: integer("acceptance_rate").default(0), // percentage
+  totalSubmissions: integer("total_submissions").default(0),
+  totalAccepted: integer("total_accepted").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const codingTestCases = pgTable("coding_test_cases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  problemId: varchar("problem_id").notNull(),
+  input: text("input").notNull(),
+  output: text("output").notNull(),
+  isHidden: boolean("is_hidden").default(false),
+});
+
+export const codingSubmissions = pgTable("coding_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  problemId: varchar("problem_id").notNull(),
+  code: text("code").notNull(),
+  language: text("language").notNull(),
+  status: text("status").notNull(), // 'Accepted', 'Wrong Answer', 'Time Limit Exceeded', etc.
+  runtime: integer("runtime"), // in ms
+  memory: integer("memory"), // in KB
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+});
+
+export const userCodingProgress = pgTable("user_coding_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  solvedCount: integer("solved_count").default(0),
+  easySolved: integer("easy_solved").default(0),
+  mediumSolved: integer("medium_solved").default(0),
+  hardSolved: integer("hard_solved").default(0),
+  xp: integer("xp").default(0),
+  streak: integer("streak").default(0),
+  lastSolvedAt: timestamp("last_solved_at"),
+  rank: integer("rank").default(0),
+  lastActiveAt: timestamp("last_active_at"),
+});
+
+export const problemCategories = pgTable("problem_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  icon: text("icon"),
+  problemCount: integer("problem_count").default(0),
+});
+
+export const userBadges = pgTable("user_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  badgeType: text("badge_type").notNull(), // 'easy_solver', 'streak_7', etc.
+  badgeName: text("badge_name").notNull(),
+  badgeDescription: text("badge_description"),
+  earnedAt: timestamp("earned_at").defaultNow().notNull(),
+});
+
+export const solvedProblems = pgTable("solved_problems", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  problemId: varchar("problem_id").notNull(),
+  firstSolvedAt: timestamp("first_solved_at").defaultNow().notNull(),
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -168,6 +248,24 @@ export const insertPipelineColumnSchema = createInsertSchema(pipelineColumns).om
   id: true,
 });
 
+export const insertCodingProblemSchema = createInsertSchema(codingProblems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCodingTestCaseSchema = createInsertSchema(codingTestCases).omit({
+  id: true,
+});
+
+export const insertCodingSubmissionSchema = createInsertSchema(codingSubmissions).omit({
+  id: true,
+  submittedAt: true,
+});
+
+export const insertUserCodingProgressSchema = createInsertSchema(userCodingProgress).omit({
+  id: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -201,3 +299,38 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 export type PipelineColumn = typeof pipelineColumns.$inferSelect;
 export type InsertPipelineColumn = z.infer<typeof insertPipelineColumnSchema>;
+
+export type CodingProblem = typeof codingProblems.$inferSelect;
+export type InsertCodingProblem = z.infer<typeof insertCodingProblemSchema>;
+
+export type CodingTestCase = typeof codingTestCases.$inferSelect;
+export type InsertCodingTestCase = z.infer<typeof insertCodingTestCaseSchema>;
+
+export type CodingSubmission = typeof codingSubmissions.$inferSelect;
+export type InsertCodingSubmission = z.infer<typeof insertCodingSubmissionSchema>;
+
+export type UserCodingProgress = typeof userCodingProgress.$inferSelect;
+export type InsertUserCodingProgress = z.infer<typeof insertUserCodingProgressSchema>;
+
+export const insertProblemCategorySchema = createInsertSchema(problemCategories).omit({
+  id: true,
+});
+
+export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({
+  id: true,
+  earnedAt: true,
+});
+
+export const insertSolvedProblemSchema = createInsertSchema(solvedProblems).omit({
+  id: true,
+  firstSolvedAt: true,
+});
+
+export type ProblemCategory = typeof problemCategories.$inferSelect;
+export type InsertProblemCategory = z.infer<typeof insertProblemCategorySchema>;
+
+export type UserBadge = typeof userBadges.$inferSelect;
+export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
+
+export type SolvedProblem = typeof solvedProblems.$inferSelect;
+export type InsertSolvedProblem = z.infer<typeof insertSolvedProblemSchema>;

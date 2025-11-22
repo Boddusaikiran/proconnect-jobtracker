@@ -51,6 +51,14 @@ export default {
           foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
           border: "var(--destructive-border)",
         },
+        success: {
+          DEFAULT: "hsl(var(--success) / <alpha-value>)",
+          foreground: "hsl(var(--success-foreground) / <alpha-value>)",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning) / <alpha-value>)",
+          foreground: "hsl(var(--warning-foreground) / <alpha-value>)",
+        },
         ring: "hsl(var(--ring) / <alpha-value>)",
         chart: {
           "1": "hsl(var(--chart-1) / <alpha-value>)",
@@ -59,6 +67,16 @@ export default {
           "4": "hsl(var(--chart-4) / <alpha-value>)",
           "5": "hsl(var(--chart-5) / <alpha-value>)",
         },
+        // Job Status Colors
+        "status-applied": "hsl(var(--status-applied) / <alpha-value>)",
+        "status-interview": "hsl(var(--status-interview) / <alpha-value>)",
+        "status-offer": "hsl(var(--status-offer) / <alpha-value>)",
+        "status-rejected": "hsl(var(--status-rejected) / <alpha-value>)",
+        "status-pending": "hsl(var(--status-pending) / <alpha-value>)",
+        // Priority Colors
+        "priority-high": "hsl(var(--priority-high) / <alpha-value>)",
+        "priority-medium": "hsl(var(--priority-medium) / <alpha-value>)",
+        "priority-low": "hsl(var(--priority-low) / <alpha-value>)",
         sidebar: {
           ring: "hsl(var(--sidebar-ring) / <alpha-value>)",
           DEFAULT: "hsl(var(--sidebar) / <alpha-value>)",

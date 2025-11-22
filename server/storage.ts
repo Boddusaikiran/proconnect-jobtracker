@@ -22,6 +22,20 @@ import {
   type InsertNotification,
   type PipelineColumn,
   type InsertPipelineColumn,
+  type CodingProblem,
+  type InsertCodingProblem,
+  type CodingTestCase,
+  type InsertCodingTestCase,
+  type CodingSubmission,
+  type InsertCodingSubmission,
+  type UserCodingProgress,
+  type InsertUserCodingProgress,
+  type ProblemCategory,
+  type InsertProblemCategory,
+  type UserBadge,
+  type InsertUserBadge,
+  type SolvedProblem,
+  type InsertSolvedProblem,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import DrizzleStorage from './drizzleStorage';
@@ -102,6 +116,37 @@ export interface IStorage {
   createPipelineColumn(column: InsertPipelineColumn): Promise<PipelineColumn>;
   updatePipelineColumn(id: string, updates: Partial<PipelineColumn>): Promise<PipelineColumn | undefined>;
   deletePipelineColumn(id: string): Promise<void>;
+
+  // Coding Platform
+  getCodingProblems(filters?: { difficulty?: string; category?: string; company?: string }): Promise<CodingProblem[]>;
+  getCodingProblem(id: string): Promise<CodingProblem | undefined>;
+  getCodingProblemBySlug(slug: string): Promise<CodingProblem | undefined>;
+  createCodingProblem(problem: InsertCodingProblem): Promise<CodingProblem>;
+
+  getCodingTestCases(problemId: string): Promise<CodingTestCase[]>;
+  createCodingTestCase(testCase: InsertCodingTestCase): Promise<CodingTestCase>;
+
+  createCodingSubmission(submission: InsertCodingSubmission): Promise<CodingSubmission>;
+  getUserSubmissions(userId: string, problemId?: string): Promise<CodingSubmission[]>;
+
+  getUserCodingProgress(userId: string): Promise<UserCodingProgress | undefined>;
+  updateUserCodingProgress(userId: string, updates: Partial<UserCodingProgress>): Promise<UserCodingProgress>;
+
+  // Categories
+  getProblemCategories(): Promise<ProblemCategory[]>;
+  createProblemCategory(category: InsertProblemCategory): Promise<ProblemCategory>;
+
+  // Badges
+  getUserBadges(userId: string): Promise<UserBadge[]>;
+  awardBadge(userId: string, badge: InsertUserBadge): Promise<UserBadge>;
+
+  // Leaderboard
+  getLeaderboard(limit?: number): Promise<UserCodingProgress[]>;
+
+  // Solved Problems
+  markProblemSolved(userId: string, problemId: string): Promise<SolvedProblem>;
+  getUserSolvedProblems(userId: string): Promise<SolvedProblem[]>;
+  isProblemSolved(userId: string, problemId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -117,6 +162,13 @@ export class MemStorage implements IStorage {
   private messages: Map<string, Message>;
   private notifications: Map<string, AppNotification>;
   private pipelineColumns: Map<string, PipelineColumn>;
+  private codingProblems: Map<string, CodingProblem>;
+  private codingTestCases: Map<string, CodingTestCase>;
+  private codingSubmissions: Map<string, CodingSubmission>;
+  private userCodingProgress: Map<string, UserCodingProgress>;
+  private problemCategories: Map<string, ProblemCategory>;
+  private userBadges: Map<string, UserBadge>;
+  private solvedProblems: Map<string, SolvedProblem>;
   private currentId: number;
 
   constructor() {
@@ -131,6 +183,13 @@ export class MemStorage implements IStorage {
     this.messages = new Map();
     this.notifications = new Map();
     this.pipelineColumns = new Map();
+    this.codingProblems = new Map();
+    this.codingTestCases = new Map();
+    this.codingSubmissions = new Map();
+    this.userCodingProgress = new Map();
+    this.problemCategories = new Map();
+    this.userBadges = new Map();
+    this.solvedProblems = new Map();
     this.currentId = 1;
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
@@ -547,6 +606,179 @@ export class MemStorage implements IStorage {
 
   async deletePipelineColumn(id: string): Promise<void> {
     this.pipelineColumns.delete(id);
+  }
+
+  // Coding Platform
+
+  async getCodingProblems(filters?: { difficulty?: string; category?: string; company?: string }): Promise<CodingProblem[]> {
+    let problems = Array.from(this.codingProblems.values());
+    if (filters) {
+      if (filters.difficulty) problems = problems.filter(p => p.difficulty === filters.difficulty);
+      if (filters.category) problems = problems.filter(p => p.category === filters.category);
+      if (filters.company) problems = problems.filter(p => p.companyTags?.includes(filters.company!));
+    }
+    return problems.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getCodingProblem(id: string): Promise<CodingProblem | undefined> {
+    return this.codingProblems.get(id);
+  }
+
+  async getCodingProblemBySlug(slug: string): Promise<CodingProblem | undefined> {
+    return Array.from(this.codingProblems.values()).find(p => p.slug === slug);
+  }
+
+  async createCodingProblem(insertProblem: InsertCodingProblem): Promise<CodingProblem> {
+    const id = randomUUID();
+    const problem: CodingProblem = {
+      ...insertProblem,
+      id,
+      createdAt: new Date(),
+      companyTags: insertProblem.companyTags ?? null,
+      constraints: insertProblem.constraints ?? null,
+      editorial: insertProblem.editorial ?? null,
+      editorialCode: insertProblem.editorialCode ?? null,
+      timeComplexity: insertProblem.timeComplexity ?? null,
+      spaceComplexity: insertProblem.spaceComplexity ?? null,
+      acceptanceRate: insertProblem.acceptanceRate ?? null,
+      totalSubmissions: insertProblem.totalSubmissions ?? null,
+      totalAccepted: insertProblem.totalAccepted ?? null,
+    };
+    this.codingProblems.set(id, problem);
+    return problem;
+  }
+
+  async getCodingTestCases(problemId: string): Promise<CodingTestCase[]> {
+    return Array.from(this.codingTestCases.values()).filter(tc => tc.problemId === problemId);
+  }
+
+  async createCodingTestCase(insertTestCase: InsertCodingTestCase): Promise<CodingTestCase> {
+    const id = randomUUID();
+    const testCase: CodingTestCase = { ...insertTestCase, id, isHidden: insertTestCase.isHidden ?? false };
+    this.codingTestCases.set(id, testCase);
+    return testCase;
+  }
+
+  async createCodingSubmission(insertSubmission: InsertCodingSubmission): Promise<CodingSubmission> {
+    const id = randomUUID();
+    const submission: CodingSubmission = {
+      ...insertSubmission,
+      id,
+      submittedAt: new Date(),
+      runtime: insertSubmission.runtime ?? null,
+      memory: insertSubmission.memory ?? null
+    };
+    this.codingSubmissions.set(id, submission);
+    return submission;
+  }
+
+  async getUserSubmissions(userId: string, problemId?: string): Promise<CodingSubmission[]> {
+    return Array.from(this.codingSubmissions.values())
+      .filter(s => s.userId === userId && (!problemId || s.problemId === problemId))
+      .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime());
+  }
+
+  async getUserCodingProgress(userId: string): Promise<UserCodingProgress | undefined> {
+    return Array.from(this.userCodingProgress.values()).find(p => p.userId === userId);
+  }
+
+  async updateUserCodingProgress(userId: string, updates: Partial<UserCodingProgress>): Promise<UserCodingProgress> {
+    let progress = await this.getUserCodingProgress(userId);
+    if (!progress) {
+      const id = randomUUID();
+      progress = {
+        id,
+        userId,
+        solvedCount: 0,
+        easySolved: 0,
+        mediumSolved: 0,
+        hardSolved: 0,
+        xp: 0,
+        streak: 0,
+        lastSolvedAt: null,
+        rank: null,
+        lastActiveAt: null,
+        ...updates
+      };
+      this.userCodingProgress.set(id, progress);
+    } else {
+      progress = { ...progress, ...updates };
+      this.userCodingProgress.set(progress.id, progress);
+    }
+    return progress;
+  }
+
+  // Categories
+  async getProblemCategories(): Promise<ProblemCategory[]> {
+    return Array.from(this.problemCategories.values());
+  }
+
+  async createProblemCategory(category: InsertProblemCategory): Promise<ProblemCategory> {
+    const id = randomUUID();
+    const newCategory: ProblemCategory = {
+      ...category,
+      id,
+      description: category.description ?? null,
+      icon: category.icon ?? null,
+      problemCount: category.problemCount ?? 0,
+    };
+    this.problemCategories.set(id, newCategory);
+    return newCategory;
+  }
+
+  // Badges
+  async getUserBadges(userId: string): Promise<UserBadge[]> {
+    return Array.from(this.userBadges.values()).filter(b => b.userId === userId);
+  }
+
+  async awardBadge(userId: string, badge: InsertUserBadge): Promise<UserBadge> {
+    const id = randomUUID();
+    const newBadge: UserBadge = {
+      ...badge,
+      id,
+      userId,
+      badgeDescription: badge.badgeDescription ?? null,
+      earnedAt: new Date(),
+    };
+    this.userBadges.set(id, newBadge);
+    return newBadge;
+  }
+
+  // Leaderboard
+  async getLeaderboard(limit: number = 100): Promise<UserCodingProgress[]> {
+    return Array.from(this.userCodingProgress.values())
+      .sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0))
+      .slice(0, limit);
+  }
+
+  // Solved Problems
+  async markProblemSolved(userId: string, problemId: string): Promise<SolvedProblem> {
+    const existing = Array.from(this.solvedProblems.values())
+      .find(sp => sp.userId === userId && sp.problemId === problemId);
+
+    if (existing) {
+      return existing;
+    }
+
+    const id = randomUUID();
+    const solved: SolvedProblem = {
+      id,
+      userId,
+      problemId,
+      firstSolvedAt: new Date(),
+    };
+    this.solvedProblems.set(id, solved);
+    return solved;
+  }
+
+  async getUserSolvedProblems(userId: string): Promise<SolvedProblem[]> {
+    return Array.from(this.solvedProblems.values())
+      .filter(sp => sp.userId === userId);
+  }
+
+  async isProblemSolved(userId: string, problemId: string): Promise<boolean> {
+    return Array.from(this.solvedProblems.values())
+      .some(sp => sp.userId === userId && sp.problemId === problemId);
   }
 }
 

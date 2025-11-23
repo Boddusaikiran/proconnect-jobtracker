@@ -31,6 +31,15 @@ export async function executeCode(req: ExecuteRequest): Promise<ExecuteResponse>
         return { output: '', error: `Unsupported language: ${req.language}` };
     }
 
+    if (!JUDGE0_KEY) {
+        console.warn("Judge0 key missing, returning mock response");
+        return {
+            output: `[MOCK OUTPUT] Executed ${req.language} code.\nInput: ${req.input || 'None'}\nOutput: Hello Verification`,
+            executionTime: 100,
+            memory: 1024
+        };
+    }
+
     const payload = {
         source_code: req.code,
         language_id: languageId,

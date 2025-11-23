@@ -8,9 +8,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Play, CheckCircle, AlertCircle, Terminal, Trophy, Flame, Target, Award, BookOpen, Users, TrendingUp } from "lucide-react";
+import { Loader2, Play, CheckCircle, AlertCircle, Terminal, Trophy, Flame, Target, Award, BookOpen, Users, TrendingUp, Bug } from "lucide-react";
 import CodeEditor from "@/components/CodeEditor";
-import { CodingProblem, CodingSubmission, UserCodingProgress, UserBadge } from "@shared/schema";
+import { CodingProblem, CodingSubmission, UserCodingProgress, UserBadge, CodingTestCase } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -18,7 +18,7 @@ export default function UnifiedCodingPlatform() {
     const { toast } = useToast();
 
     // State
-    const [selectedProblem, setSelectedProblem] = useState<CodingProblem | null>(null);
+    const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
     const [code, setCode] = useState("");
     const [language, setLanguage] = useState("javascript");
     const [difficulty, setDifficulty] = useState<string>("all");
@@ -26,8 +26,10 @@ export default function UnifiedCodingPlatform() {
     const [search, setSearch] = useState("");
     const [activeTab, setActiveTab] = useState("description");
     const [mainView, setMainView] = useState<"problems" | "leaderboard" | "profile">("problems");
+    const [output, setOutput] = useState<{ stdout: string; stderr?: string; error?: string } | null>(null);
+    const [isRunning, setIsRunning] = useState(false);
 
-    // Fetch problems
+    // Fetch problems list
     const { data: problems, isLoading: problemsLoading } = useQuery<CodingProblem[]>({
         queryKey: ["/api/coding/problems", difficulty, category],
         queryFn: async () => {
@@ -37,6 +39,12 @@ export default function UnifiedCodingPlatform() {
             const res = await fetch(`/api/coding/problems?${params}`);
             return res.json();
         },
+    });
+
+    // Fetch full problem details (including test cases)
+    const { data: selectedProblem } = useQuery<CodingProblem & { testCases: CodingTestCase[] }>({
+        queryKey: [`/api/coding/problems/${selectedProblemId}`],
+        enabled: !!selectedProblemId,
     });
 
     // Fetch user progress
@@ -58,14 +66,14 @@ export default function UnifiedCodingPlatform() {
 
     // Fetch submissions for selected problem
     const { data: submissions } = useQuery<CodingSubmission[]>({
-        queryKey: [`/api/coding/user/submissions/${selectedProblem?.id}`],
-        enabled: !!selectedProblem?.id,
+        queryKey: [`/api/coding/user/submissions/${selectedProblemId}`],
+        enabled: !!selectedProblemId,
     });
 
     // Fetch editorial
     const { data: editorial } = useQuery({
-        queryKey: [`/api/coding/editorial/${selectedProblem?.id}`],
-        enabled: !!selectedProblem?.id && activeTab === "editorial",
+        queryKey: [`/api/coding/editorial/${selectedProblemId}`],
+        enabled: !!selectedProblemId && activeTab === "editorial",
     });
 
     // Set initial code when problem loads
@@ -80,11 +88,49 @@ export default function UnifiedCodingPlatform() {
         }
     }, [selectedProblem, language]);
 
+    // Run Code Mutation
+    const runMutation = useMutation({
+        mutationFn: async () => {
+            setIsRunning(true);
+            setOutput(null);
+            // Use the first test case input if available, otherwise empty
+            const input = selectedProblem?.testCases?.[0]?.input || "";
+            const res = await apiRequest("POST", "/api/coding/run", {
+                code,
+                language,
+                input
+            });
+            return res.json();
+        },
+        onSuccess: (data) => {
+            setOutput({
+                stdout: data.output,
+                stderr: data.error,
+                error: data.error
+            });
+            setIsRunning(false);
+            // Switch to output tab if we add one, or just show the panel
+        },
+        onError: (err: any) => {
+            setOutput({
+                stdout: "",
+                error: err.message,
+                stderr: err.message
+            });
+            setIsRunning(false);
+            toast({
+                title: "Execution Failed",
+                description: err.message,
+                variant: "destructive",
+            });
+        },
+    });
+
     // Submit mutation
     const submitMutation = useMutation({
         mutationFn: async () => {
             const res = await apiRequest("POST", "/api/coding/submit", {
-                problemId: selectedProblem?.id,
+                problemId: selectedProblemId,
                 code,
                 language,
             });
@@ -235,8 +281,8 @@ export default function UnifiedCodingPlatform() {
                                         {filteredProblems?.map((problem) => (
                                             <div
                                                 key={problem.id}
-                                                onClick={() => setSelectedProblem(problem)}
-                                                className={`p-3 rounded-lg cursor-pointer transition-colors ${selectedProblem?.id === problem.id
+                                                onClick={() => setSelectedProblemId(problem.id)}
+                                                className={`p-3 rounded-lg cursor-pointer transition-colors ${selectedProblemId === problem.id
                                                     ? "bg-primary/10 border-l-2 border-primary"
                                                     : "hover:bg-muted"
                                                     }`}
@@ -272,6 +318,9 @@ export default function UnifiedCodingPlatform() {
                                     <TabsList className="bg-transparent p-0 h-10">
                                         <TabsTrigger value="description" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
                                             Description
+                                        </TabsTrigger>
+                                        <TabsTrigger value="testcases" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                                            Test Cases
                                         </TabsTrigger>
                                         <TabsTrigger value="editorial" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
                                             Editorial
@@ -310,6 +359,40 @@ export default function UnifiedCodingPlatform() {
                                                             <Badge key={tag} variant="secondary">{tag}</Badge>
                                                         ))}
                                                     </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </ScrollArea>
+                                </TabsContent>
+
+                                <TabsContent value="testcases" className="flex-1 p-0 m-0 overflow-hidden">
+                                    <ScrollArea className="h-full p-4">
+                                        <div className="space-y-6">
+                                            {selectedProblem.testCases && selectedProblem.testCases.length > 0 ? (
+                                                selectedProblem.testCases.map((tc, index) => (
+                                                    !tc.isHidden && (
+                                                        <div key={index} className="space-y-2">
+                                                            <h3 className="font-semibold text-sm">Case {index + 1}</h3>
+                                                            <div className="grid gap-4">
+                                                                <div className="space-y-1">
+                                                                    <span className="text-xs text-muted-foreground font-mono">Input:</span>
+                                                                    <pre className="bg-muted p-3 rounded-md text-sm font-mono overflow-x-auto">
+                                                                        {tc.input}
+                                                                    </pre>
+                                                                </div>
+                                                                <div className="space-y-1">
+                                                                    <span className="text-xs text-muted-foreground font-mono">Output:</span>
+                                                                    <pre className="bg-muted p-3 rounded-md text-sm font-mono overflow-x-auto">
+                                                                        {tc.output}
+                                                                    </pre>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                ))
+                                            ) : (
+                                                <div className="text-center text-muted-foreground py-8">
+                                                    No public test cases available.
                                                 </div>
                                             )}
                                         </div>
@@ -404,64 +487,104 @@ export default function UnifiedCodingPlatform() {
 
                     <ResizableHandle />
 
-                    {/* Right Panel: Code Editor */}
+                    {/* Right Panel: Code Editor & Output */}
                     <ResizablePanel defaultSize={40} minSize={30}>
-                        <div className="h-full flex flex-col bg-[#1e1e1e]">
-                            {/* Editor Header */}
-                            <div className="h-12 border-b border-[#2d2d2d] flex items-center px-4 justify-between bg-[#1e1e1e]">
-                                <select
-                                    value={language}
-                                    onChange={(e) => setLanguage(e.target.value)}
-                                    className="bg-[#2d2d2d] text-gray-300 text-sm border-none rounded px-3 py-1.5 cursor-pointer focus:ring-2 focus:ring-primary"
-                                    disabled={!selectedProblem}
-                                >
-                                    <option value="javascript">JavaScript</option>
-                                    <option value="python">Python</option>
-                                    <option value="cpp">C++</option>
-                                    <option value="java">Java</option>
-                                    <option value="typescript">TypeScript</option>
-                                    <option value="go">Go</option>
-                                    <option value="csharp">C#</option>
-                                    <option value="rust">Rust</option>
-                                </select>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() => submitMutation.mutate()}
-                                        disabled={submitMutation.isPending || !selectedProblem}
-                                    >
-                                        <Play className="h-4 w-4 mr-2" />
-                                        Run
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        onClick={() => submitMutation.mutate()}
-                                        disabled={submitMutation.isPending || !selectedProblem}
-                                    >
-                                        {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit"}
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Code Editor */}
-                            <div className="flex-1 relative">
-                                {selectedProblem ? (
-                                    <CodeEditor
-                                        language={language}
-                                        value={code}
-                                        onChange={setCode}
-                                        height="100%"
-                                    />
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-gray-500">
-                                        <div className="text-center">
-                                            <p className="text-sm">Select a problem to start coding</p>
+                        <ResizablePanelGroup direction="vertical">
+                            <ResizablePanel defaultSize={70} minSize={30}>
+                                <div className="h-full flex flex-col bg-[#1e1e1e]">
+                                    {/* Editor Header */}
+                                    <div className="h-12 border-b border-[#2d2d2d] flex items-center px-4 justify-between bg-[#1e1e1e]">
+                                        <select
+                                            value={language}
+                                            onChange={(e) => setLanguage(e.target.value)}
+                                            className="bg-[#2d2d2d] text-gray-300 text-sm border-none rounded px-3 py-1.5 cursor-pointer focus:ring-2 focus:ring-primary"
+                                            disabled={!selectedProblem}
+                                        >
+                                            <option value="javascript">JavaScript</option>
+                                            <option value="python">Python</option>
+                                            <option value="cpp">C++</option>
+                                            <option value="java">Java</option>
+                                            <option value="typescript">TypeScript</option>
+                                            <option value="go">Go</option>
+                                            <option value="csharp">C#</option>
+                                            <option value="rust">Rust</option>
+                                        </select>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={() => runMutation.mutate()}
+                                                disabled={runMutation.isPending || !selectedProblem}
+                                            >
+                                                {runMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+                                                Run
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                onClick={() => submitMutation.mutate()}
+                                                disabled={submitMutation.isPending || !selectedProblem}
+                                            >
+                                                {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit"}
+                                            </Button>
                                         </div>
                                     </div>
-                                )}
-                            </div>
-                        </div>
+
+                                    {/* Code Editor */}
+                                    <div className="flex-1 relative">
+                                        {selectedProblem ? (
+                                            <CodeEditor
+                                                language={language}
+                                                value={code}
+                                                onChange={setCode}
+                                                height="100%"
+                                            />
+                                        ) : (
+                                            <div className="h-full flex items-center justify-center text-gray-500">
+                                                <div className="text-center">
+                                                    <p className="text-sm">Select a problem to start coding</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </ResizablePanel>
+
+                            <ResizableHandle />
+
+                            {/* Output Panel */}
+                            <ResizablePanel defaultSize={30} minSize={10} maxSize={50}>
+                                <div className="h-full flex flex-col bg-[#1e1e1e] border-t border-[#2d2d2d]">
+                                    <div className="h-8 flex items-center px-4 bg-[#252526] border-b border-[#2d2d2d]">
+                                        <span className="text-xs font-medium text-gray-400 uppercase">Console Output</span>
+                                    </div>
+                                    <ScrollArea className="flex-1 p-4 font-mono text-sm">
+                                        {output ? (
+                                            <div className="space-y-2">
+                                                {output.error && (
+                                                    <div className="text-red-400">
+                                                        <div className="font-bold mb-1">Error:</div>
+                                                        <pre className="whitespace-pre-wrap">{output.error}</pre>
+                                                    </div>
+                                                )}
+                                                {output.stdout && (
+                                                    <div className="text-gray-300">
+                                                        <div className="font-bold mb-1 text-gray-500">Output:</div>
+                                                        <pre className="whitespace-pre-wrap">{output.stdout}</pre>
+                                                    </div>
+                                                )}
+                                                {!output.error && !output.stdout && (
+                                                    <div className="text-gray-500 italic">No output returned.</div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="text-gray-500 italic">
+                                                Run your code to see output here...
+                                            </div>
+                                        )}
+                                    </ScrollArea>
+                                </div>
+                            </ResizablePanel>
+                        </ResizablePanelGroup>
                     </ResizablePanel>
                 </ResizablePanelGroup>
             ) : mainView === "leaderboard" ? (

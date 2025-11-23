@@ -38,6 +38,10 @@ async function startServer() {
     // Register API routes and get the http server (socket.io attached there)
     const httpServer = await registerRoutes(app);
 
+    // Seed initial data
+    await seedData();
+    console.log("✅ Data seeding complete");
+
     // Serve static files from client directory
     const clientPath = path.join(process.cwd(), "client");
     app.use(express.static(clientPath));
